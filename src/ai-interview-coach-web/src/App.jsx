@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import './App.css'
+import NewSessionModal from './components/NewSessionModal.jsx'
+import QuestionRow from './components/QuestionRow.jsx'
+import ExportButton from './components/ExportButton.jsx'
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000').replace(/\/$/, '')
 
@@ -17,97 +20,53 @@ async function apiFetch(path, options = {}) {
 }
 
 function App() {
-  const [roleDescription, setRoleDescription] = useState('')
-  const [questionCount, setQuestionCount] = useState(5)
-  const [manualQuestionText, setManualQuestionText] = useState('')
+  const [showModal, setShowModal] = useState(false)
   const [sessionId, setSessionId] = useState('')
+  const [roleDescription, setRoleDescription] = useState('')
   const [questions, setQuestions] = useState([])
-  const [selectedQuestionId, setSelectedQuestionId] = useState('')
-  const [answer, setAnswer] = useState('')
   const [summaryCount, setSummaryCount] = useState(3)
   const [summary, setSummary] = useState('')
   const [savedSessions, setSavedSessions] = useState([])
+  const [expandedSessionId, setExpandedSessionId] = useState('')
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  const selectedQuestion = useMemo(
-    () => questions.find((question) => question.id === selectedQuestionId),
-    [questions, selectedQuestionId],
-  )
-
   const answeredCount = useMemo(
-    () => questions.filter((question) => question.answer?.trim()).length,
+    () => questions.filter((q) => q.answer?.trim()).length,
     [questions],
   )
 
-  const manualQuestions = useMemo(
-    () => manualQuestionText.split('\n').map((q) => q.trim()).filter(Boolean),
-    [manualQuestionText],
-  )
-
-  async function generateQuestions(event) {
-    event.preventDefault()
-    setStatus('Generating questions...')
-    setSummary('')
-    setIsLoading(true)
-
+  const loadSavedSessions = useCallback(async () => {
     try {
-      const data = await apiFetch('/api/interview/generate', {
-        method: 'POST',
-        body: JSON.stringify({
-          roleDescription,
-          questionCount: Number(questionCount),
-          manualQuestions,
-        }),
-      })
-
-      setSessionId(data.sessionId)
-      setQuestions(data.questions)
-      setSelectedQuestionId(data.questions[0]?.id ?? '')
-      setSummaryCount((prev) => Math.min(prev, data.questions.length || 1))
-      setAnswer('')
-      setStatus('Questions generated.')
-    } catch (error) {
-      setStatus(`Failed: ${error.message}`)
-    } finally {
-      setIsLoading(false)
+      const data = await apiFetch('/api/interview/saved')
+      setSavedSessions(data)
+    } catch {
+      // keep UI interactive even when API is unavailable
     }
+  }, [])
+
+  function handleSessionCreated(data) {
+    setSessionId(data.sessionId)
+    setRoleDescription(data.questions.length > 0 ? '' : '')
+    setQuestions(data.questions)
+    setSummary('')
+    setSummaryCount(Math.min(3, data.questions.length || 1))
+    setStatus('Questions generated — expand a row to start answering.')
   }
 
-  async function submitAnswer(event) {
-    event.preventDefault()
-    if (!sessionId || !selectedQuestionId || !answer.trim()) return
-
-    setStatus('Evaluating answer...')
-    setIsLoading(true)
-
-    try {
-      const data = await apiFetch('/api/interview/answer', {
-        method: 'POST',
-        body: JSON.stringify({ sessionId, questionId: selectedQuestionId, answer }),
-      })
-
-      setQuestions((previous) =>
-        previous.map((question) =>
-          question.id === selectedQuestionId ? data.question : question,
-        ),
-      )
-      setAnswer('')
-      setStatus('Feedback generated.')
-    } catch (error) {
-      setStatus(`Failed: ${error.message}`)
-    } finally {
-      setIsLoading(false)
-    }
+  function handleQuestionUpdated(updatedQuestion) {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q)),
+    )
+    setStatus('Feedback received.')
   }
 
   async function saveSession() {
     if (!sessionId) return
-
     setIsLoading(true)
     try {
       await apiFetch(`/api/interview/session/${sessionId}/save`, { method: 'POST' })
-      setStatus('Session saved for future reference.')
+      setStatus('Session saved.')
       await loadSavedSessions()
     } catch (error) {
       setStatus(`Failed: ${error.message}`)
@@ -118,7 +77,6 @@ function App() {
 
   async function generateSummary() {
     if (!sessionId) return
-
     setIsLoading(true)
     try {
       const data = await apiFetch(`/api/interview/session/${sessionId}/summary`, {
@@ -134,140 +92,173 @@ function App() {
     }
   }
 
-  async function loadSavedSessions() {
-    try {
-      const data = await apiFetch('/api/interview/saved')
-      setSavedSessions(data)
-    } catch {
-      // keep UI interactive even when API is unavailable
+  function loadSession(session) {
+    if (expandedSessionId === session.id) {
+      setExpandedSessionId('')
+      return
     }
+    setExpandedSessionId(session.id)
+    setSessionId(session.id)
+    setRoleDescription(session.roleDescription)
+    setQuestions(session.questions)
+    setSummary('')
+    setSummaryCount(Math.min(3, session.questions.length || 1))
+    setStatus('')
   }
 
   return (
-    <main>
-      <h1>AI Interview Coach</h1>
-      <form onSubmit={generateQuestions} className="card">
-        <label>
-          Role description
-          <input
-            value={roleDescription}
-            onChange={(event) => setRoleDescription(event.target.value)}
-            placeholder="e.g. Senior Backend Engineer focused on .NET and distributed systems"
-            required
-          />
-        </label>
+    <div className="dashboard">
+      {/* ── Header ── */}
+      <header className="topbar">
+        <h1>AI Interview Coach</h1>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => setShowModal(true)}
+        >
+          + New Session
+        </button>
+      </header>
 
-        <label>
-          Number of questions
-          <input
-            type="number"
-            min="1"
-            max="20"
-            value={questionCount}
-            onChange={(event) => setQuestionCount(event.target.value)}
-            required
-          />
-        </label>
+      <NewSessionModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSessionCreated={handleSessionCreated}
+        apiFetch={apiFetch}
+      />
 
-        <label>
-          Optional manual questions (one per line)
-          <textarea
-            value={manualQuestionText}
-            onChange={(event) => setManualQuestionText(event.target.value)}
-            rows={4}
-          />
-        </label>
-
-        <button type="submit" disabled={isLoading}>Generate interview questions</button>
-      </form>
-
-      {questions.length > 0 && (
-        <section className="card">
-          <h2>Session Questions</h2>
-          <p>Session ID: {sessionId}</p>
-          <p>
-            Answered: {answeredCount}/{questions.length}
-          </p>
-          <ul>
-            {questions.map((question) => (
-              <li key={question.id}>
-                <button
-                  type="button"
-                  className={question.id === selectedQuestionId ? 'selected' : ''}
-                  onClick={() => {
-                    setSelectedQuestionId(question.id)
-                    setAnswer(question.answer ?? '')
-                  }}
-                >
-                  {question.text}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {selectedQuestion && (
-        <form onSubmit={submitAnswer} className="card">
-          <h2>Answer question</h2>
-          <p>{selectedQuestion.text}</p>
-          <textarea
-            value={answer}
-            onChange={(event) => setAnswer(event.target.value)}
-            rows={6}
-            placeholder="Type your answer here"
-            required
-          />
-          <button type="submit" disabled={isLoading}>Get feedback</button>
-          {selectedQuestion.feedback && (
-            <p className="feedback">Feedback: {selectedQuestion.feedback}</p>
-          )}
-        </form>
-      )}
-
-      {sessionId && (
-        <section className="card">
-          <h2>Session actions</h2>
-          <button type="button" onClick={saveSession} disabled={isLoading}>
-            Save questions & answers
-          </button>
-
-          <div className="summaryRow">
-            <label>
-              Summarize first X answered questions
-              <input
-                type="number"
-                min="1"
-                max={questions.length || 1}
-                value={summaryCount}
-                onChange={(event) => setSummaryCount(event.target.value)}
-              />
-            </label>
-            <button type="button" onClick={generateSummary} disabled={isLoading}>
-              Generate overall feedback
-            </button>
+      {/* ── Active Session ── */}
+      {questions.length > 0 && !expandedSessionId && (
+        <section className="card session-card">
+          <div className="session-header">
+            <div>
+              <h2>Current Session</h2>
+              <p className="meta">
+                {answeredCount}/{questions.length} answered
+              </p>
+            </div>
+            <div className="session-actions">
+              <ExportButton questions={questions} roleDescription={roleDescription} />
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={saveSession}
+                disabled={isLoading}
+              >
+                💾 Save
+              </button>
+            </div>
           </div>
 
-          {summary && <p className="feedback">Overall feedback: {summary}</p>}
+          <div className="questions-list">
+            {questions.map((q) => (
+              <QuestionRow
+                key={q.id}
+                question={q}
+                sessionId={sessionId}
+                apiFetch={apiFetch}
+                onQuestionUpdated={handleQuestionUpdated}
+              />
+            ))}
+          </div>
+
+          <div className="summary-section">
+            <div className="summary-controls">
+              <label>
+                Summarize first
+                <input
+                  type="number"
+                  min="1"
+                  max={questions.length || 1}
+                  value={summaryCount}
+                  onChange={(e) => setSummaryCount(e.target.value)}
+                  className="summary-input"
+                />
+                answered questions
+              </label>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={generateSummary}
+                disabled={isLoading}
+              >
+                Generate Summary
+              </button>
+            </div>
+            {summary && <div className="feedback-content summary-box">{summary}</div>}
+          </div>
         </section>
       )}
 
+      {/* ── Saved Sessions ── */}
       <section className="card">
-        <h2>Saved sessions</h2>
-        <button type="button" onClick={loadSavedSessions}>
-          Refresh saved history
-        </button>
-        <ul>
-          {savedSessions.map((session) => (
-            <li key={session.id}>
-              <strong>{session.roleDescription}</strong> ({session.questions.length} questions)
-            </li>
-          ))}
-        </ul>
+        <div className="session-header">
+          <h2>Saved Sessions</h2>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={loadSavedSessions}
+          >
+            ↻ Refresh
+          </button>
+        </div>
+
+        {savedSessions.length === 0 && (
+          <p className="placeholder-text">
+            No saved sessions yet. Start a new session and save it!
+          </p>
+        )}
+
+        {savedSessions.map((session) => (
+          <div key={session.id} className="saved-session">
+            <button
+              type="button"
+              className="saved-session-header"
+              onClick={() => loadSession(session)}
+              aria-expanded={expandedSessionId === session.id}
+            >
+              <div>
+                <strong>{session.roleDescription}</strong>
+                <span className="meta"> — {session.questions.length} questions</span>
+              </div>
+              <span className={`chevron ${expandedSessionId === session.id ? 'open' : ''}`}>
+                ▾
+              </span>
+            </button>
+
+            {expandedSessionId === session.id && (
+              <div className="saved-session-body">
+                <div className="session-actions" style={{ marginBottom: '0.75rem' }}>
+                  <ExportButton
+                    questions={session.questions}
+                    roleDescription={session.roleDescription}
+                  />
+                </div>
+                {session.questions.map((q) => (
+                  <QuestionRow
+                    key={q.id}
+                    question={q}
+                    sessionId={session.id}
+                    apiFetch={apiFetch}
+                    onQuestionUpdated={handleQuestionUpdated}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </section>
 
-      {status && <p className="status">{status}</p>}
-    </main>
+      {/* ── Status Toast ── */}
+      {status && (
+        <div className="toast">
+          <span>{status}</span>
+          <button type="button" className="toast-close" onClick={() => setStatus('')}>
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

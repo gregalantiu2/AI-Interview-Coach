@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AIInterviewCoach.Api.Tests/AIInterviewCoach.Api.Tests.csproj" />
+    <Project Path="src/AIInterviewCoach.Api/AIInterviewCoach.Api.csproj" />
+  </Folder>
+</Solution>

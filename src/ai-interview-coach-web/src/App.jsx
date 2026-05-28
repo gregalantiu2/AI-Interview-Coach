@@ -28,6 +28,7 @@ function App() {
   const [summary, setSummary] = useState('')
   const [savedSessions, setSavedSessions] = useState([])
   const [status, setStatus] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const selectedQuestion = useMemo(
     () => questions.find((question) => question.id === selectedQuestionId),
@@ -48,6 +49,7 @@ function App() {
     event.preventDefault()
     setStatus('Generating questions...')
     setSummary('')
+    setIsLoading(true)
 
     try {
       const data = await apiFetch('/api/interview/generate', {
@@ -62,10 +64,13 @@ function App() {
       setSessionId(data.sessionId)
       setQuestions(data.questions)
       setSelectedQuestionId(data.questions[0]?.id ?? '')
+      setSummaryCount((prev) => Math.min(prev, data.questions.length || 1))
       setAnswer('')
       setStatus('Questions generated.')
     } catch (error) {
       setStatus(`Failed: ${error.message}`)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -74,6 +79,7 @@ function App() {
     if (!sessionId || !selectedQuestionId || !answer.trim()) return
 
     setStatus('Evaluating answer...')
+    setIsLoading(true)
 
     try {
       const data = await apiFetch('/api/interview/answer', {
@@ -90,24 +96,30 @@ function App() {
       setStatus('Feedback generated.')
     } catch (error) {
       setStatus(`Failed: ${error.message}`)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   async function saveSession() {
     if (!sessionId) return
 
+    setIsLoading(true)
     try {
       await apiFetch(`/api/interview/session/${sessionId}/save`, { method: 'POST' })
       setStatus('Session saved for future reference.')
       await loadSavedSessions()
     } catch (error) {
       setStatus(`Failed: ${error.message}`)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   async function generateSummary() {
     if (!sessionId) return
 
+    setIsLoading(true)
     try {
       const data = await apiFetch(`/api/interview/session/${sessionId}/summary`, {
         method: 'POST',
@@ -117,6 +129,8 @@ function App() {
       setStatus('Summary feedback ready.')
     } catch (error) {
       setStatus(`Failed: ${error.message}`)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -164,7 +178,7 @@ function App() {
           />
         </label>
 
-        <button type="submit">Generate interview questions</button>
+        <button type="submit" disabled={isLoading}>Generate interview questions</button>
       </form>
 
       {questions.length > 0 && (
@@ -204,7 +218,7 @@ function App() {
             placeholder="Type your answer here"
             required
           />
-          <button type="submit">Get feedback</button>
+          <button type="submit" disabled={isLoading}>Get feedback</button>
           {selectedQuestion.feedback && (
             <p className="feedback">Feedback: {selectedQuestion.feedback}</p>
           )}
@@ -214,7 +228,7 @@ function App() {
       {sessionId && (
         <section className="card">
           <h2>Session actions</h2>
-          <button type="button" onClick={saveSession}>
+          <button type="button" onClick={saveSession} disabled={isLoading}>
             Save questions & answers
           </button>
 
@@ -224,11 +238,12 @@ function App() {
               <input
                 type="number"
                 min="1"
+                max={questions.length || 1}
                 value={summaryCount}
                 onChange={(event) => setSummaryCount(event.target.value)}
               />
             </label>
-            <button type="button" onClick={generateSummary}>
+            <button type="button" onClick={generateSummary} disabled={isLoading}>
               Generate overall feedback
             </button>
           </div>

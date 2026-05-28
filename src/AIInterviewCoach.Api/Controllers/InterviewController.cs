@@ -45,6 +45,8 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     [HttpPost("session/{sessionId}/summary")]
     public async Task<ActionResult<string>> GenerateSummary(string sessionId, [FromBody] GenerateSummaryRequest request, CancellationToken cancellationToken)
     {
+        if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
+
         try
         {
             var response = await _service.GenerateSummaryAsync(sessionId, request.QuestionsToInclude, cancellationToken);
@@ -59,6 +61,8 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     [HttpPost("session/{sessionId}/save")]
     public async Task<ActionResult<SaveSessionResponse>> SaveSession(string sessionId, CancellationToken cancellationToken)
     {
+        if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
+
         try
         {
             var session = await _service.SaveSessionAsync(sessionId, cancellationToken);
@@ -73,6 +77,8 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     [HttpGet("session/{sessionId}")]
     public async Task<ActionResult<InterviewSession>> GetSession(string sessionId, CancellationToken cancellationToken)
     {
+        if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
+
         var session = await _service.GetSessionAsync(sessionId, cancellationToken);
         return session is null ? NotFound() : Ok(session);
     }
@@ -83,4 +89,6 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
         var sessions = await _service.ListSavedSessionsAsync(cancellationToken);
         return Ok(sessions);
     }
+
+    private static bool IsValidSessionId(string sessionId) => Guid.TryParse(sessionId, out _);
 }

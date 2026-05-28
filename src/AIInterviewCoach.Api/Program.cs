@@ -26,7 +26,8 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Llm:ApiKey"]) ||
 }
 else
 {
-    builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>();
+    builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>()
+        .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));
 }
 
 builder.Services.AddScoped<InterviewCoachService>();
@@ -36,7 +37,18 @@ var cosmosKey = builder.Configuration["Cosmos:Key"];
 
 if (!string.IsNullOrWhiteSpace(cosmosEndpoint) && !string.IsNullOrWhiteSpace(cosmosKey))
 {
-    builder.Services.AddSingleton(serviceProvider => new CosmosClient(cosmosEndpoint, cosmosKey));
+    CosmosClientOptions cosmosOptions = builder.Environment.IsDevelopment()
+        ? new CosmosClientOptions
+        {
+            HttpClientFactory = () => new HttpClient(new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            }),
+            ConnectionMode = ConnectionMode.Gateway
+        }
+        : new CosmosClientOptions();
+
+    builder.Services.AddSingleton(new CosmosClient(cosmosEndpoint, cosmosKey, cosmosOptions));
     builder.Services.AddScoped<IInterviewSessionRepository, CosmosInterviewSessionRepository>();
 }
 else
@@ -45,6 +57,15 @@ else
 }
 
 var app = builder.Build();
+
+if (!string.IsNullOrWhiteSpace(cosmosEndpoint) && !string.IsNullOrWhiteSpace(cosmosKey))
+{
+    var cosmosClient = app.Services.GetRequiredService<CosmosClient>();
+    var dbName = app.Configuration["Cosmos:DatabaseName"] ?? "ai-interview-coach";
+    var containerName = app.Configuration["Cosmos:ContainerName"] ?? "interview-sessions";
+    var dbResponse = await cosmosClient.CreateDatabaseIfNotExistsAsync(dbName);
+    await dbResponse.Database.CreateContainerIfNotExistsAsync(containerName, "/id");
+}
 
 if (app.Environment.IsDevelopment())
 {

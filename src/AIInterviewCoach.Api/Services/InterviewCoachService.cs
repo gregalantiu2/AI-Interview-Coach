@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AIInterviewCoach.Api.Models;
 using AIInterviewCoach.Api.Repositories;
 
@@ -34,7 +35,7 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
 
         if (remainingCount > 0)
         {
-            var prompt = $"Generate {remainingCount} interview questions for this role: \"{request.RoleDescription}\". Return only a JSON array of question strings.";
+            var prompt = $"Generate {remainingCount} interview questions for the following role. Return only a JSON array of question strings.\n<role>{request.RoleDescription}</role>";
             var response = await _llmClient.CompleteAsync(prompt, cancellationToken);
             generatedQuestions.AddRange(ParseQuestions(response).Take(remainingCount).Select(x => new InterviewQuestion { Text = x }));
         }
@@ -68,7 +69,7 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
         question.Answer = request.Answer.Trim();
         question.AnsweredAt = DateTimeOffset.UtcNow;
         question.Feedback = await _llmClient.CompleteAsync(
-            $"Role: {session.RoleDescription}\nQuestion: {question.Text}\nCandidate answer: {question.Answer}\nProvide concise, actionable interview feedback.",
+            $"<role>{session.RoleDescription}</role>\n<question>{question.Text}</question>\n<answer>{question.Answer}</answer>\nProvide concise, actionable interview feedback.",
             cancellationToken);
 
         session.UpdatedAt = DateTimeOffset.UtcNow;
@@ -96,7 +97,7 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             $"Q{index + 1}: {q.Text}\nA{index + 1}: {q.Answer}\nFeedback: {q.Feedback}"));
 
         return await _llmClient.CompleteAsync(
-            $"Role: {session.RoleDescription}\nReview these interview responses and provide overall coaching focus areas:\n{qaBlock}",
+            $"<role>{session.RoleDescription}</role>\nReview these interview responses and provide overall coaching focus areas:\n<interview-responses>\n{qaBlock}\n</interview-responses>",
             cancellationToken);
     }
 
@@ -140,6 +141,7 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
         return content
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(x => x.TrimStart('-', '*', ' ', '\t'))
+            .Select(x => Regex.Replace(x, @"^\d+[.)]\s*", string.Empty))
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .ToList();
     }

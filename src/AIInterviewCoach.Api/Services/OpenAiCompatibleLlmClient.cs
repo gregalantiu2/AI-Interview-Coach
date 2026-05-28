@@ -4,28 +4,29 @@ using System.Text.Json;
 
 namespace AIInterviewCoach.Api.Services;
 
-public class OpenAiCompatibleLlmClient(HttpClient httpClient, IConfiguration configuration) : ILlmClient
+public class OpenAiCompatibleLlmClient : ILlmClient
 {
-    private readonly HttpClient _httpClient = httpClient;
-    private readonly IConfiguration _configuration = configuration;
+    private readonly HttpClient _httpClient;
+    private readonly string _apiKey;
+    private readonly string _endpoint;
+    private readonly string _model;
+
+    public OpenAiCompatibleLlmClient(HttpClient httpClient, IConfiguration configuration)
+    {
+        _httpClient = httpClient;
+        _apiKey = configuration["Llm:ApiKey"]!;
+        _endpoint = configuration["Llm:Endpoint"]!;
+        _model = configuration["Llm:Model"]!;
+    }
 
     public async Task<string> CompleteAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        var apiKey = _configuration["Llm:ApiKey"];
-        var endpoint = _configuration["Llm:Endpoint"];
-        var model = _configuration["Llm:Model"];
-
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
-        {
-            throw new InvalidOperationException("LLM configuration is missing. Set Llm:ApiKey, Llm:Endpoint, and Llm:Model.");
-        }
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
         var payload = new
         {
-            model,
+            model = _model,
             messages = new[]
             {
                 new { role = "system", content = "You are an interview coach assistant." },

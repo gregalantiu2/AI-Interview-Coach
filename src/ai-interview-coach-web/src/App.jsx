@@ -47,7 +47,6 @@ function App() {
 
   function handleSessionCreated(data) {
     setSessionId(data.sessionId)
-    setRoleDescription(data.questions.length > 0 ? '' : '')
     setQuestions(data.questions)
     setSummary('')
     setSummaryCount(Math.min(3, data.questions.length || 1))

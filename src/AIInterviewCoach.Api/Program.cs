@@ -36,7 +36,7 @@ var cosmosKey = builder.Configuration["Cosmos:Key"];
 
 if (!string.IsNullOrWhiteSpace(cosmosEndpoint) && !string.IsNullOrWhiteSpace(cosmosKey))
 {
-    builder.Services.AddSingleton(_ => new CosmosClient(cosmosEndpoint, cosmosKey));
+    builder.Services.AddSingleton(serviceProvider => new CosmosClient(cosmosEndpoint, cosmosKey));
     builder.Services.AddScoped<IInterviewSessionRepository, CosmosInterviewSessionRepository>();
 }
 else

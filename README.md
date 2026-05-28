@@ -15,9 +15,9 @@ AI-powered interview practice app with a React frontend, C# API, and Azure Cosmo
 
 ## Structure
 
-- Frontend: `/tmp/workspace/gregalantiu2/AI-Interview-Coach/src/ai-interview-coach-web` (React + Vite)
-- API: `/tmp/workspace/gregalantiu2/AI-Interview-Coach/src/AIInterviewCoach.Api` (ASP.NET Core)
-- Tests: `/tmp/workspace/gregalantiu2/AI-Interview-Coach/src/AIInterviewCoach.Api.Tests` (xUnit)
+- Frontend: `src/ai-interview-coach-web` (React + Vite)
+- API: `src/AIInterviewCoach.Api` (ASP.NET Core)
+- Tests: `src/AIInterviewCoach.Api.Tests` (xUnit)
 
 ## Configure backend
 
@@ -39,14 +39,14 @@ If Cosmos settings are not provided, the API uses in-memory storage for local de
 ### API
 
 ```bash
-cd /tmp/workspace/gregalantiu2/AI-Interview-Coach
+cd <repository-root>
 dotnet run --project src/AIInterviewCoach.Api
 ```
 
 ### Frontend
 
 ```bash
-cd /tmp/workspace/gregalantiu2/AI-Interview-Coach/src/ai-interview-coach-web
+cd src/ai-interview-coach-web
 npm run dev
 ```
 
@@ -55,6 +55,6 @@ Optional: set `VITE_API_BASE_URL` if API is not hosted at `http://localhost:5000
 ## Test
 
 ```bash
-cd /tmp/workspace/gregalantiu2/AI-Interview-Coach
+cd <repository-root>
 dotnet test AIInterviewCoach.slnx
 ```

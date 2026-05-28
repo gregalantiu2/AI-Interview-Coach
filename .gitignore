@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Local developer overrides — may contain secrets, never commit
+src/AIInterviewCoach.Api/appsettings.Development.json
+
 # User-specific files
 *.rsuser
 *.suo

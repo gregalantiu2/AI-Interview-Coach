@@ -1,6 +1,7 @@
 using AIInterviewCoach.Api.Models;
 using AIInterviewCoach.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AIInterviewCoach.Api.Controllers;
 
@@ -11,6 +12,7 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     private readonly InterviewCoachService _service = service;
 
     [HttpPost("generate")]
+    [EnableRateLimiting("llm")]
     public async Task<ActionResult<GenerateQuestionsResponse>> GenerateQuestions([FromBody] GenerateQuestionsRequest request, CancellationToken cancellationToken)
     {
         try
@@ -25,6 +27,7 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     }
 
     [HttpPost("answer")]
+    [EnableRateLimiting("llm")]
     public async Task<ActionResult<SubmitAnswerResponse>> SubmitAnswer([FromBody] SubmitAnswerRequest request, CancellationToken cancellationToken)
     {
         try
@@ -43,6 +46,7 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     }
 
     [HttpPost("session/{sessionId}/summary")]
+    [EnableRateLimiting("llm")]
     public async Task<ActionResult<string>> GenerateSummary(string sessionId, [FromBody] GenerateSummaryRequest request, CancellationToken cancellationToken)
     {
         if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
@@ -59,6 +63,7 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     }
 
     [HttpPost("session/{sessionId}/save")]
+    [EnableRateLimiting("general")]
     public async Task<ActionResult<SaveSessionResponse>> SaveSession(string sessionId, CancellationToken cancellationToken)
     {
         if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
@@ -75,6 +80,7 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     }
 
     [HttpGet("session/{sessionId}")]
+    [EnableRateLimiting("general")]
     public async Task<ActionResult<InterviewSession>> GetSession(string sessionId, CancellationToken cancellationToken)
     {
         if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
@@ -84,6 +90,7 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
     }
 
     [HttpGet("saved")]
+    [EnableRateLimiting("general")]
     public async Task<ActionResult<IReadOnlyList<InterviewSession>>> GetSavedSessions(CancellationToken cancellationToken)
     {
         var sessions = await _service.ListSavedSessionsAsync(cancellationToken);

@@ -21,10 +21,11 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             throw new ArgumentException("Question count must be greater than zero.");
         }
 
+        var manualQuestionSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var manualQuestions = request.ManualQuestions?
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(q => manualQuestionSet.Add(q))
             .Select(q => new InterviewQuestion { Text = q })
             .ToList() ?? [];
 

@@ -51,8 +51,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors("frontend");
 app.UseHttpsRedirection();
+app.UseCors("frontend");
 app.UseAuthorization();
 app.MapControllers();
 

@@ -257,10 +257,6 @@ export default function QuestionRow({ question, sessionId, apiFetch, onQuestionU
   )
 }
 
-
-const DRAFT_KEY = (id) => `answer-draft-${id}`
-
-export default function QuestionRow({ question, sessionId, apiFetch, onQuestionUpdated, onDelete }) {
   const [isOpen, setIsOpen] = useState(false)
   const [answer, setAnswer] = useState(() => {
     if (question.answer) return question.answer

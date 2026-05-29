@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using AIInterviewCoach.Api.Infrastructure;
+using Scalar.AspNetCore;
 using AIInterviewCoach.Api.Repositories;
 using AIInterviewCoach.Api.Services;
 using Microsoft.AspNetCore.RateLimiting;
@@ -118,6 +119,7 @@ if (!string.IsNullOrWhiteSpace(cosmosEndpoint) && !string.IsNullOrWhiteSpace(cos
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();

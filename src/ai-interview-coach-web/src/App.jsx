@@ -28,6 +28,7 @@ function App() {
   const [showNewProfileModal, setShowNewProfileModal] = useState(false)
   const [showAddQuestionsModal, setShowAddQuestionsModal] = useState(false)
   const [profileToDelete, setProfileToDelete] = useState(null)
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('questionViewMode') ?? 'modal')
   const [summary, setSummary] = useState('')
   const [summaryCount, setSummaryCount] = useState(3)
   const [status, setStatus] = useState('')
@@ -64,7 +65,7 @@ function App() {
     setActiveProfile(profile)
     setSummary('')
     setSummaryCount(Math.min(3, data.questions.length || 1))
-    setStatus('Profile created â€” questions generated.')
+    setStatus('Profile created \u2014 questions generated.')
   }
 
   function handleQuestionsAdded(data) {
@@ -131,6 +132,11 @@ function App() {
     } finally {
       setProfileToDelete(null)
     }
+  }
+
+  function handleViewModeChange(mode) {
+    setViewMode(mode)
+    localStorage.setItem('questionViewMode', mode)
   }
 
   function selectProfile(profile) {
@@ -202,6 +208,22 @@ function App() {
                 </p>
               </div>
               <div className="session-actions">
+                <div className="view-mode-toggle" role="group" aria-label="Question view mode">
+                  <button
+                    type="button"
+                    className={`view-mode-btn ${viewMode === 'modal' ? 'active' : ''}`}
+                    onClick={() => handleViewModeChange('modal')}
+                  >
+                    Modal
+                  </button>
+                  <button
+                    type="button"
+                    className={`view-mode-btn ${viewMode === 'expand' ? 'active' : ''}`}
+                    onClick={() => handleViewModeChange('expand')}
+                  >
+                    Expanded
+                  </button>
+                </div>
                 <ExportButton
                   questions={activeProfile.questions}
                   roleDescription={activeProfile.roleDescription}
@@ -227,6 +249,7 @@ function App() {
                   apiFetch={apiFetch}
                   onQuestionUpdated={handleQuestionUpdated}
                   onDelete={handleQuestionDeleted}
+                  viewMode={viewMode}
                 />
               ))}
             </div>

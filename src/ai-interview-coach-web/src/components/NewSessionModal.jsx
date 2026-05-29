@@ -85,7 +85,14 @@ export default function NewSessionModal({ isOpen, onClose, onSessionCreated, api
           {error && <p className="error-text">{error}</p>}
 
           <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading ? 'Generating...' : 'Generate Questions'}
+            {isLoading ? (
+              <>
+                Generating...
+                <span className="spinner" aria-hidden="true" />
+              </>
+            ) : (
+              'Generate Questions'
+            )}
           </button>
         </form>
       </div>

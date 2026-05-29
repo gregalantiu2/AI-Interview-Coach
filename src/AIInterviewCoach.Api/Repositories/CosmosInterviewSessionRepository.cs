@@ -45,4 +45,23 @@ public class CosmosInterviewSessionRepository : IInterviewSessionRepository
 
         return sessions;
     }
+
+    public async Task<IReadOnlyList<InterviewSession>> ListAllAsync(CancellationToken cancellationToken = default)
+    {
+        var query = _container.GetItemQueryIterator<InterviewSession>(new QueryDefinition("SELECT * FROM c ORDER BY c.updatedAt DESC"));
+        var sessions = new List<InterviewSession>();
+
+        while (query.HasMoreResults)
+        {
+            var response = await query.ReadNextAsync(cancellationToken);
+            sessions.AddRange(response);
+        }
+
+        return sessions;
+    }
+
+    public async Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        await _container.DeleteItemAsync<InterviewSession>(sessionId, new PartitionKey(sessionId), cancellationToken: cancellationToken);
+    }
 }

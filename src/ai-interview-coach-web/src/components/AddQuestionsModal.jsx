@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
 
-export default function NewSessionModal({ isOpen, onClose, onSessionCreated, apiFetch }) {
-  const [roleDescription, setRoleDescription] = useState('')
-  const [questionCount, setQuestionCount] = useState(5)
+export default function AddQuestionsModal({ isOpen, onClose, profileId, onQuestionsAdded, apiFetch }) {
+  const [questionCount, setQuestionCount] = useState(3)
   const [manualQuestionText, setManualQuestionText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -14,21 +13,20 @@ export default function NewSessionModal({ isOpen, onClose, onSessionCreated, api
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!profileId) return
     setError('')
     setIsLoading(true)
 
     try {
-      const data = await apiFetch('/api/interview/generate', {
+      const data = await apiFetch(`/api/interview/session/${profileId}/questions`, {
         method: 'POST',
         body: JSON.stringify({
-          roleDescription,
           questionCount: Number(questionCount),
           manualQuestions,
         }),
       })
-      onSessionCreated(data)
-      setRoleDescription('')
-      setQuestionCount(5)
+      onQuestionsAdded(data)
+      setQuestionCount(3)
       setManualQuestionText('')
       onClose()
     } catch (err) {
@@ -44,7 +42,7 @@ export default function NewSessionModal({ isOpen, onClose, onSessionCreated, api
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>New Interview Profile</h2>
+          <h2>Add Questions</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
             ✕
           </button>
@@ -52,40 +50,30 @@ export default function NewSessionModal({ isOpen, onClose, onSessionCreated, api
 
         <form onSubmit={handleSubmit} className="modal-body">
           <label>
-            Role description
-            <input
-              value={roleDescription}
-              onChange={(e) => setRoleDescription(e.target.value)}
-              placeholder="e.g. Senior Backend Engineer focused on .NET and distributed systems"
-              required
-            />
-          </label>
-
-          <label>
-            Number of questions
+            Number of AI-generated questions to add
             <input
               type="number"
-              min="1"
+              min="0"
               max="20"
               value={questionCount}
               onChange={(e) => setQuestionCount(e.target.value)}
-              required
             />
           </label>
 
           <label>
-            Optional manual questions (one per line)
+            Manual questions (one per line, optional)
             <textarea
               value={manualQuestionText}
               onChange={(e) => setManualQuestionText(e.target.value)}
               rows={4}
+              placeholder="Type questions here, one per line..."
             />
           </label>
 
           {error && <p className="error-text">{error}</p>}
 
           <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading ? 'Generating...' : 'Generate Questions'}
+            {isLoading ? 'Adding...' : 'Add Questions'}
           </button>
         </form>
       </div>

@@ -44,13 +44,13 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
         {
             RoleDescription = request.RoleDescription.Trim(),
             Questions = [..manualQuestions, ..generatedQuestions],
-            IsSaved = false,
+            IsSaved = true,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
         await _repository.UpsertAsync(session, cancellationToken);
 
-        return new GenerateQuestionsResponse(session.Id, session.Questions);
+        return new GenerateQuestionsResponse(session.Id, session.RoleDescription, session.Questions);
     }
 
     public async Task<SubmitAnswerResponse> SubmitAnswerAsync(SubmitAnswerRequest request, CancellationToken cancellationToken = default)
@@ -118,6 +118,78 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
     public Task<IReadOnlyList<InterviewSession>> ListSavedSessionsAsync(CancellationToken cancellationToken = default)
         => _repository.ListSavedAsync(cancellationToken);
 
+    public Task<IReadOnlyList<InterviewSession>> ListAllSessionsAsync(CancellationToken cancellationToken = default)
+        => _repository.ListAllAsync(cancellationToken);
+
+    public async Task DeleteSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        var session = await _repository.GetAsync(sessionId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profile not found.");
+
+        await _repository.DeleteAsync(session.Id, cancellationToken);
+    }
+
+    public async Task<AddQuestionsResponse> AddQuestionsAsync(string sessionId, AddQuestionsRequest request, CancellationToken cancellationToken = default)
+    {
+        var session = await _repository.GetAsync(sessionId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profile not found.");
+
+        var manualQuestionSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var manualQuestions = request.ManualQuestions?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Where(q => manualQuestionSet.Add(q))
+            .Select(q => new InterviewQuestion { Text = q })
+            .ToList() ?? [];
+
+        var remainingCount = Math.Max(request.QuestionCount - manualQuestions.Count, 0);
+        var generatedQuestions = new List<InterviewQuestion>();
+
+        if (remainingCount > 0)
+        {
+            var prompt = $"Generate {remainingCount} interview questions for the following role. Return only a JSON array of question strings.\n<role>{session.RoleDescription}</role>";
+            var response = await _llmClient.CompleteAsync(prompt, cancellationToken);
+            generatedQuestions.AddRange(ParseQuestions(response).Take(remainingCount).Select(x => new InterviewQuestion { Text = x }));
+        }
+
+        var newQuestions = new List<InterviewQuestion>([..manualQuestions, ..generatedQuestions]);
+        session.Questions.AddRange(newQuestions);
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _repository.UpsertAsync(session, cancellationToken);
+
+        return new AddQuestionsResponse(newQuestions, session.Questions);
+    }
+
+    public async Task<GetTipsResponse> GetTipsAsync(string sessionId, string questionId, CancellationToken cancellationToken = default)
+    {
+        var session = await _repository.GetAsync(sessionId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profile not found.");
+
+        var question = session.Questions.FirstOrDefault(x => x.Id == questionId)
+            ?? throw new KeyNotFoundException("Question not found.");
+
+        question.Tips = await _llmClient.CompleteAsync(
+            $"<role>{session.RoleDescription}</role>\n<question>{question.Text}</question>\nProvide concise tips for answering this interview question well, then give one strong example answer.",
+            cancellationToken);
+
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _repository.UpsertAsync(session, cancellationToken);
+
+        return new GetTipsResponse(question.Tips, question);
+    }
+
+    public async Task DeleteQuestionAsync(string sessionId, string questionId, CancellationToken cancellationToken = default)
+    {
+        var session = await _repository.GetAsync(sessionId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profile not found.");
+
+        var removed = session.Questions.RemoveAll(q => q.Id == questionId);
+        if (removed == 0) throw new KeyNotFoundException("Question not found.");
+
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _repository.UpsertAsync(session, cancellationToken);
+    }
+
     private static IReadOnlyList<string> ParseQuestions(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -125,24 +197,32 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             return [];
         }
 
-        try
+        // Try to locate a JSON array anywhere in the response (LLMs sometimes add preamble text)
+        var arrayStart = content.IndexOf('[');
+        var arrayEnd = content.LastIndexOf(']');
+        if (arrayStart >= 0 && arrayEnd > arrayStart)
         {
-            var parsed = JsonSerializer.Deserialize<List<string>>(content);
-            if (parsed is { Count: > 0 })
+            var jsonSlice = content[arrayStart..(arrayEnd + 1)];
+            try
             {
-                return parsed.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToList();
+                var parsed = JsonSerializer.Deserialize<List<string>>(jsonSlice);
+                if (parsed is { Count: > 0 })
+                {
+                    return parsed.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToList();
+                }
             }
-        }
-        catch (JsonException)
-        {
-            // fallback parsing below
+            catch (JsonException) { }
         }
 
+        // Fallback: split on newlines and clean up each line
         return content
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(x => x.TrimStart('-', '*', ' ', '\t'))
             .Select(x => Regex.Replace(x, @"^\d+[.)]\s*", string.Empty))
-            .Where(x => !string.IsNullOrWhiteSpace(x))
+            // Strip surrounding quotes and trailing commas that some models include
+            .Select(x => x.Trim('"', ',', ' '))
+            // Exclude lines that look like JSON structure rather than questions
+            .Where(x => !string.IsNullOrWhiteSpace(x) && x.Length > 5 && !x.StartsWith('[') && !x.StartsWith(']'))
             .ToList();
     }
 }

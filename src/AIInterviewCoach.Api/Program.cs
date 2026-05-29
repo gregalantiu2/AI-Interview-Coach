@@ -32,7 +32,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Llm:ApiKey"]) ||
 else
 {
     builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>()
-        .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));
+        .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(300));
 }
 
 builder.Services.AddScoped<InterviewCoachService>();

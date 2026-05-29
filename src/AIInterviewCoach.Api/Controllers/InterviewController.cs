@@ -97,5 +97,81 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
         return Ok(sessions);
     }
 
+    [HttpGet("profiles")]
+    [EnableRateLimiting("general")]
+    public async Task<ActionResult<IReadOnlyList<InterviewSession>>> GetProfiles(CancellationToken cancellationToken)
+    {
+        var profiles = await _service.ListAllSessionsAsync(cancellationToken);
+        return Ok(profiles);
+    }
+
+    [HttpPost("session/{sessionId}/questions")]
+    [EnableRateLimiting("llm")]
+    public async Task<ActionResult<AddQuestionsResponse>> AddQuestions(string sessionId, [FromBody] AddQuestionsRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
+
+        try
+        {
+            var response = await _service.AddQuestionsAsync(sessionId, request, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpPost("session/{sessionId}/question/{questionId}/tips")]
+    [EnableRateLimiting("llm")]
+    public async Task<ActionResult<GetTipsResponse>> GetTips(string sessionId, string questionId, CancellationToken cancellationToken)
+    {
+        if (!IsValidSessionId(sessionId) || !IsValidSessionId(questionId)) return BadRequest("Invalid ID format.");
+
+        try
+        {
+            var response = await _service.GetTipsAsync(sessionId, questionId, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpDelete("session/{sessionId}")]
+    [EnableRateLimiting("general")]
+    public async Task<IActionResult> DeleteProfile(string sessionId, CancellationToken cancellationToken)
+    {
+        if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
+
+        try
+        {
+            await _service.DeleteSessionAsync(sessionId, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpDelete("session/{sessionId}/question/{questionId}")]
+    [EnableRateLimiting("general")]
+    public async Task<IActionResult> DeleteQuestion(string sessionId, string questionId, CancellationToken cancellationToken)
+    {
+        if (!IsValidSessionId(sessionId) || !IsValidSessionId(questionId)) return BadRequest("Invalid ID format.");
+
+        try
+        {
+            await _service.DeleteQuestionAsync(sessionId, questionId, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     private static bool IsValidSessionId(string sessionId) => Guid.TryParse(sessionId, out _);
 }

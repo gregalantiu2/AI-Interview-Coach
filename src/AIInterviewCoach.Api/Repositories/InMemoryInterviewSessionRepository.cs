@@ -27,4 +27,18 @@ public class InMemoryInterviewSessionRepository : IInterviewSessionRepository
             .ToList();
         return Task.FromResult<IReadOnlyList<InterviewSession>>(items);
     }
+
+    public Task<IReadOnlyList<InterviewSession>> ListAllAsync(CancellationToken cancellationToken = default)
+    {
+        var items = _sessions.Values
+            .OrderByDescending(x => x.UpdatedAt)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<InterviewSession>>(items);
+    }
+
+    public Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        _sessions.TryRemove(sessionId, out _);
+        return Task.CompletedTask;
+    }
 }

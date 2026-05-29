@@ -9,4 +9,8 @@ public interface IInterviewSessionRepository
     Task<InterviewSession?> GetAsync(string sessionId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<InterviewSession>> ListSavedAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<InterviewSession>> ListAllAsync(CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(string sessionId, CancellationToken cancellationToken = default);
 }

@@ -217,6 +217,11 @@ textarea {
   color: #1e40af;
 }
 
+.badge-tips {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 @media (prefers-color-scheme: dark) {
   .badge-answered {
     background: rgba(16, 185, 129, 0.2);
@@ -226,6 +231,11 @@ textarea {
   .badge-feedback {
     background: rgba(59, 130, 246, 0.2);
     color: #93c5fd;
+  }
+
+  .badge-tips {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fcd34d;
   }
 }
 
@@ -261,6 +271,12 @@ textarea {
   gap: 0.5rem;
 }
 
+.answer-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .answer-panel h4,
 .feedback-panel h4 {
   margin: 0.75rem 0 0;
@@ -279,10 +295,49 @@ textarea {
   color: var(--text-h);
 }
 
+.feedback-content p { margin: 0 0 0.6em; }
+.feedback-content p:last-child { margin-bottom: 0; }
+.feedback-content ul,
+.feedback-content ol { margin: 0 0 0.6em 1.25rem; padding: 0; }
+.feedback-content li { margin-bottom: 0.25rem; }
+.feedback-content strong { font-weight: 600; }
+.feedback-content h1,
+.feedback-content h2,
+.feedback-content h3,
+.feedback-content h4 { margin: 0.75em 0 0.4em; font-weight: 600; line-height: 1.3; }
+
 .placeholder-text {
   color: var(--text);
   font-size: 0.875rem;
   font-style: italic;
+}
+
+.feedback-spinner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  font-style: italic;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Summary section ── */
@@ -413,6 +468,29 @@ textarea {
   gap: 1rem;
 }
 
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem 1.25rem;
+}
+
+.confirm-modal .modal-body p {
+  margin: 0;
+  color: var(--text-h);
+}
+
+/* ── Danger button ── */
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;
@@ -463,4 +541,221 @@ textarea {
 .error-text {
   color: #dc2626;
   font-size: 0.875rem;
+}
+
+/* ── App layout (sidebar + main) ── */
+.app-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100svh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-title {
+  font-size: 1rem !important;
+  font-weight: 600;
+  margin: 0 !important;
+  letter-spacing: -0.3px;
+}
+
+.sidebar-empty {
+  padding: 1rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-style: italic;
+}
+
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.profile-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  transition: background 0.15s;
+  width: 100%;
+  padding: 0;
+}
+
+.profile-item:hover {
+  background: var(--accent-bg);
+}
+
+.profile-item-active {
+  background: var(--accent-bg);
+  outline: 1px solid var(--accent-border);
+}
+
+.profile-item-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 0.625rem 0.75rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-h);
+}
+
+.btn-delete-profile {
+  opacity: 0;
+  flex-shrink: 0;
+  padding: 0.4rem 0.5rem;
+  margin-right: 0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text);
+  border-radius: 6px;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.profile-item:hover .btn-delete-profile,
+.profile-item:focus-within .btn-delete-profile {
+  opacity: 1;
+}
+
+.btn-delete-profile:hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.profile-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-meta {
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+/* ── Main content ── */
+.main-content {
+  padding: 1.5rem;
+  overflow-y: auto;
+  max-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.main-title {
+  font-size: 1.25rem !important;
+  margin: 0 !important;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text);
+  font-size: 0.9375rem;
+}
+
+.status-text {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── Question row with delete ── */
+.question-row-header-wrapper {
+  display: flex;
+  align-items: stretch;
+}
+
+.question-row-header {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-delete-question {
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text);
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.question-row:hover .btn-delete-question {
+  opacity: 0.45;
+}
+
+.btn-delete-question:hover:not(:disabled) {
+  opacity: 1;
+  color: #ef4444;
+}
+
+.btn-delete-question:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* ── Responsive sidebar ── */
+@media (max-width: 700px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .main-content {
+    max-height: none;
+  }
 }

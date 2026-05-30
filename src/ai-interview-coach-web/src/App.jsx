@@ -31,8 +31,18 @@ function App() {
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('questionViewMode') ?? 'modal')
   const [summary, setSummary] = useState('')
   const [summaryCount, setSummaryCount] = useState(3)
-  const [status, setStatus] = useState('')
+  const [toasts, setToasts] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+
+  function addToast(message) {
+    const id = Date.now() + Math.random()
+    setToasts((prev) => [...prev, { id, message }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000)
+  }
+
+  function removeToast(id) {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }
 
   const answeredCount = useMemo(
     () => activeProfile?.questions.filter((q) => q.answer?.trim()).length ?? 0,
@@ -65,7 +75,7 @@ function App() {
     setActiveProfile(profile)
     setSummary('')
     setSummaryCount(Math.min(3, data.questions.length || 1))
-    setStatus('Profile created \u2014 questions generated.')
+    setStatus('Profile created — questions generated.')
   }
 
   function handleQuestionsAdded(data) {
@@ -75,7 +85,7 @@ function App() {
         p.id === activeProfile?.id ? { ...p, questions: data.allQuestions } : p,
       ),
     )
-    setStatus(`${data.newQuestions.length} question(s) added.`)
+    addToast(`${data.newQuestions.length} question(s) added.`)
   }
 
   function handleQuestionUpdated(updatedQuestion, statusMessage = 'Feedback received.') {
@@ -83,7 +93,7 @@ function App() {
       ...prev,
       questions: prev.questions.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q)),
     }))
-    setStatus(statusMessage)
+    addToast(statusMessage)
   }
 
   function handleQuestionDeleted(questionId) {
@@ -109,9 +119,9 @@ function App() {
         body: JSON.stringify({ questionsToInclude: Number(summaryCount) }),
       })
       setSummary(data)
-      setStatus('Summary ready.')
+      addToast('Summary ready.')
     } catch (error) {
-      setStatus(`Failed: ${error.message}`)
+      addToast(`Failed: ${error.message}`)
     } finally {
       setIsLoading(false)
     }
@@ -125,10 +135,9 @@ function App() {
       if (activeProfile?.id === profileToDelete.id) {
         setActiveProfile(null)
         setSummary('')
-        setStatus('')
       }
     } catch (error) {
-      setStatus(`Failed to delete profile: ${error.message}`)
+      addToast(`Failed to delete profile: ${error.message}`)
     } finally {
       setProfileToDelete(null)
     }
@@ -143,11 +152,20 @@ function App() {
     setActiveProfile(profile)
     setSummary('')
     setSummaryCount(Math.min(3, profile.questions.length || 1))
-    setStatus('')
   }
 
   return (
     <div className="app-layout">
+      {toasts.length > 0 && (
+        <div className="toast-container" aria-live="polite">
+          {toasts.map((t) => (
+            <div key={t.id} className="toast">
+              <span>{t.message}</span>
+              <button type="button" className="toast-close" onClick={() => removeToast(t.id)} aria-label="Dismiss">&#x2715;</button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* â”€â”€ Sidebar â”€â”€ */}
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -209,19 +227,20 @@ function App() {
               </div>
               <div className="session-actions">
                 <div className="view-mode-toggle" role="group" aria-label="Question view mode">
+                  <span className="view-mode-label">View:</span>
                   <button
                     type="button"
                     className={`view-mode-btn ${viewMode === 'modal' ? 'active' : ''}`}
                     onClick={() => handleViewModeChange('modal')}
                   >
-                    Modal
+                    Pop-up
                   </button>
                   <button
                     type="button"
                     className={`view-mode-btn ${viewMode === 'expand' ? 'active' : ''}`}
                     onClick={() => handleViewModeChange('expand')}
                   >
-                    Expanded
+                    Expand
                   </button>
                 </div>
                 <ExportButton
@@ -249,36 +268,12 @@ function App() {
                   apiFetch={apiFetch}
                   onQuestionUpdated={handleQuestionUpdated}
                   onDelete={handleQuestionDeleted}
+                  onToast={addToast}
                   viewMode={viewMode}
                 />
               ))}
             </div>
 
-            <div className="summary-section">
-              <div className="summary-controls">
-                <label>
-                  Summarize first
-                  <input
-                    type="number"
-                    min="1"
-                    max={activeProfile.questions.length || 1}
-                    value={summaryCount}
-                    onChange={(e) => setSummaryCount(e.target.value)}
-                    className="summary-input"
-                  />
-                  answered questions
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={generateSummary}
-                  disabled={isLoading}
-                >
-                  Generate Summary
-                </button>
-              </div>
-              {summary && <div className="feedback-content summary-box">{summary}</div>}
-            </div>
           </>
         )}
       </main>

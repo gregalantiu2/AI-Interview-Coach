@@ -4,8 +4,9 @@ import ConfirmModal from './ConfirmModal.jsx'
 
 const DRAFT_KEY = (id) => `answer-draft-${id}`
 
-export default function QuestionRow({ question, sessionId, apiFetch, onQuestionUpdated, onDelete, viewMode = 'modal' }) {
+export default function QuestionRow({ question, sessionId, apiFetch, onQuestionUpdated, onDelete, onToast, viewMode = 'modal' }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('feedback')
   const [answer, setAnswer] = useState(() => {
     if (question.answer) return question.answer
     return localStorage.getItem(DRAFT_KEY(question.id)) ?? ''
@@ -36,9 +37,12 @@ export default function QuestionRow({ question, sessionId, apiFetch, onQuestionU
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, viewMode])
 
-  async function submitAnswer(event) {
-    event.preventDefault()
-    if (!sessionId || !answer.trim()) return
+  async function handleSubmitAnswer() {
+    if (!answer.trim()) {
+      onToast?.('Please enter an answer before generating feedback.')
+      return
+    }
+    if (!sessionId) return
     setIsLoading(true)
     try {
       const data = await apiFetch('/api/interview/answer', {
@@ -53,6 +57,7 @@ export default function QuestionRow({ question, sessionId, apiFetch, onQuestionU
       setIsLoading(false)
     }
   }
+
 
   async function handleDelete(event) {
     event.stopPropagation()
@@ -96,61 +101,84 @@ export default function QuestionRow({ question, sessionId, apiFetch, onQuestionU
   const hasFeedback = question.feedback?.trim()
   const hasTips = question.tips?.trim()
 
-  const answerForm = (
-    <form onSubmit={submitAnswer} className="answer-panel">
+  const answerSection = (
+    <div className="answer-panel">
       <h4>Your Answer</h4>
       <textarea
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
-        rows={7}
         placeholder="Type your answer here..."
-        required
       />
-      <div className="answer-actions">
-        <button type="submit" className="btn btn-primary btn-sm" disabled={isLoading}>
-          {isLoading ? 'Evaluating\u2026' : 'Get Feedback'}
+    </div>
+  )
+
+  const tabbedPanel = (
+    <div className="question-tab-panel">
+      <div className="tab-bar" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'feedback'}
+          className={`tab-btn${activeTab === 'feedback' ? ' active' : ''}`}
+          onClick={() => setActiveTab('feedback')}
+        >
+          Feedback
         </button>
         <button
           type="button"
-          className="btn btn-outline btn-sm"
-          onClick={handleGetTips}
-          disabled={isLoadingTips}
+          role="tab"
+          aria-selected={activeTab === 'tips'}
+          className={`tab-btn${activeTab === 'tips' ? ' active' : ''}`}
+          onClick={() => setActiveTab('tips')}
         >
-          {isLoadingTips ? 'Loading tips\u2026' : 'Get Tips'}
+          Tips &amp; Example
         </button>
       </div>
-    </form>
-  )
-
-  const feedbackPanels = (
-    <>
-      <div className="feedback-panel">
-        <h4>AI Feedback</h4>
-        {isLoading ? (
-          <div className="feedback-spinner" aria-label="Waiting for feedback">
-            <span className="spinner" />
-            <span className="spinner-text">Evaluating your answer\u2026</span>
-          </div>
-        ) : hasFeedback ? (
-          <div className="feedback-content" dangerouslySetInnerHTML={{ __html: marked.parse(question.feedback) }} />
-        ) : (
-          <p className="placeholder-text">Submit your answer to receive AI-powered feedback.</p>
+      <div className="tab-content" role="tabpanel">
+        {activeTab === 'feedback' && (
+          isLoading ? (
+            <div className="feedback-spinner" aria-label="Waiting for feedback">
+              <span className="spinner" />
+              <span className="spinner-text">Evaluating your answer…</span>
+            </div>
+          ) : hasFeedback ? (
+            <div className="feedback-content" dangerouslySetInnerHTML={{ __html: marked.parse(question.feedback) }} />
+          ) : (
+            <div className="tab-empty-state">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleSubmitAnswer}
+                disabled={isLoading}
+              >
+                Generate Feedback
+              </button>
+            </div>
+          )
+        )}
+        {activeTab === 'tips' && (
+          isLoadingTips ? (
+            <div className="feedback-spinner" aria-label="Loading tips">
+              <span className="spinner" />
+              <span className="spinner-text">Generating tips…</span>
+            </div>
+          ) : hasTips ? (
+            <div className="feedback-content" dangerouslySetInnerHTML={{ __html: marked.parse(question.tips) }} />
+          ) : (
+            <div className="tab-empty-state">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={handleGetTips}
+                disabled={isLoadingTips}
+              >
+                Get Tips
+              </button>
+            </div>
+          )
         )}
       </div>
-      <div className="feedback-panel">
-        <h4>Tips &amp; Example Answer</h4>
-        {isLoadingTips ? (
-          <div className="feedback-spinner" aria-label="Loading tips">
-            <span className="spinner" />
-            <span className="spinner-text">Generating tips\u2026</span>
-          </div>
-        ) : hasTips ? (
-          <div className="feedback-content" dangerouslySetInnerHTML={{ __html: marked.parse(question.tips) }} />
-        ) : (
-          <p className="placeholder-text">Click "Get Tips" to see guidance and an example answer.</p>
-        )}
-      </div>
-    </>
+    </div>
   )
 
   return (
@@ -181,15 +209,21 @@ export default function QuestionRow({ question, sessionId, apiFetch, onQuestionU
             aria-label="Delete question"
             title="Delete question"
           >
-            &#x2715;
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" />
+              <path d="M14 11v6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
           </button>
         </div>
 
         {viewMode === 'expand' && isOpen && (
           <div className="question-row-body">
-            {answerForm}
+            {answerSection}
             <div className="question-expand-panels">
-              {feedbackPanels}
+              {tabbedPanel}
             </div>
           </div>
         )}
@@ -216,20 +250,32 @@ export default function QuestionRow({ question, sessionId, apiFetch, onQuestionU
             </div>
 
             <div className="modal-body question-modal-body">
-              {answerForm}
+              {answerSection}
               <div className="question-modal-panels">
-                {feedbackPanels}
+                {tabbedPanel}
               </div>
             </div>
 
             <div className="modal-footer question-modal-footer">
               <button
                 type="button"
-                className="btn btn-danger btn-sm"
+                className="btn-icon-delete"
                 onClick={handleDelete}
                 disabled={isDeleting}
+                aria-label="Delete question"
+                title="Delete question"
               >
-                {isDeleting ? 'Deleting\u2026' : 'Delete Question'}
+                {isDeleting ? (
+                  <span className="spinner" style={{ borderColor: 'rgba(255,255,255,0.35)', borderTopColor: '#fff' }} />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                )}
               </button>
               <button
                 type="button"

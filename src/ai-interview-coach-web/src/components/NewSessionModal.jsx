@@ -1,35 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 export default function NewSessionModal({ isOpen, onClose, onSessionCreated, apiFetch }) {
-  const [roleDescription, setRoleDescription] = useState('')
-  const [questionCount, setQuestionCount] = useState(5)
-  const [manualQuestionText, setManualQuestionText] = useState('')
+  const [roleName, setRoleName] = useState('')
+  const [roleSummary, setRoleSummary] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const manualQuestions = useMemo(
-    () => manualQuestionText.split('\n').map((q) => q.trim()).filter(Boolean),
-    [manualQuestionText],
-  )
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
     setIsLoading(true)
 
+    const roleDescription = roleName.trim() + (roleSummary.trim() ? '\n\n' + roleSummary.trim() : '')
+
     try {
-      const data = await apiFetch('/api/interview/generate', {
+      const data = await apiFetch('/api/interview/profiles', {
         method: 'POST',
-        body: JSON.stringify({
-          roleDescription,
-          questionCount: Number(questionCount),
-          manualQuestions,
-        }),
+        body: JSON.stringify({ roleDescription }),
       })
       onSessionCreated(data)
-      setRoleDescription('')
-      setQuestionCount(5)
-      setManualQuestionText('')
+      setRoleName('')
+      setRoleSummary('')
       onClose()
     } catch (err) {
       setError(err.message)
@@ -52,47 +43,30 @@ export default function NewSessionModal({ isOpen, onClose, onSessionCreated, api
 
         <form onSubmit={handleSubmit} className="modal-body">
           <label>
-            Role description
+            Role / Job Title
             <input
-              value={roleDescription}
-              onChange={(e) => setRoleDescription(e.target.value)}
-              placeholder="e.g. Senior Backend Engineer focused on .NET and distributed systems"
+              value={roleName}
+              onChange={(e) => setRoleName(e.target.value)}
+              placeholder="e.g. Senior Backend Engineer"
               required
             />
           </label>
 
           <label>
-            Number of questions
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={questionCount}
-              onChange={(e) => setQuestionCount(e.target.value)}
-              required
-            />
-          </label>
-
-          <label>
-            Optional manual questions (one per line)
+            Role Summary
+            <span className="label-hint">The more detail here, the better targeted your questions will be</span>
             <textarea
-              value={manualQuestionText}
-              onChange={(e) => setManualQuestionText(e.target.value)}
-              rows={4}
+              value={roleSummary}
+              onChange={(e) => setRoleSummary(e.target.value)}
+              rows={5}
+              placeholder="e.g. Focused on .NET and distributed systems, responsible for designing microservices, mentoring junior engineers..."
             />
           </label>
 
           {error && <p className="error-text">{error}</p>}
 
           <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                Generating...
-                <span className="spinner" aria-hidden="true" />
-              </>
-            ) : (
-              'Generate Questions'
-            )}
+            {isLoading ? 'Creating…' : 'Create Profile'}
           </button>
         </form>
       </div>

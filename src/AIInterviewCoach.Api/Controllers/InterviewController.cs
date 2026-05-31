@@ -97,6 +97,21 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
         return Ok(sessions);
     }
 
+    [HttpPost("profiles")]
+    [EnableRateLimiting("general")]
+    public async Task<ActionResult<InterviewSession>> CreateProfile([FromBody] CreateProfileRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var session = await _service.CreateProfileAsync(request, cancellationToken);
+            return Ok(session);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     [HttpGet("profiles")]
     [EnableRateLimiting("general")]
     public async Task<ActionResult<IReadOnlyList<InterviewSession>>> GetProfiles(CancellationToken cancellationToken)
@@ -165,6 +180,23 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
         try
         {
             await _service.DeleteQuestionAsync(sessionId, questionId, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpPatch("session/{sessionId}/question/{questionId}/answer")]
+    [EnableRateLimiting("general")]
+    public async Task<IActionResult> SaveAnswer(string sessionId, string questionId, [FromBody] SaveAnswerRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsValidSessionId(sessionId)) return BadRequest("Invalid session ID format.");
+
+        try
+        {
+            await _service.SaveAnswerAsync(sessionId, questionId, request, cancellationToken);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

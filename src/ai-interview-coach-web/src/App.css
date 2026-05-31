@@ -1672,3 +1672,57 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* ── Empty question bank callouts ── */
+.empty-bank-overlays {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 600px;
+  padding: 1.5rem 0;
+}
+
+.empty-bank-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  background: var(--accent-bg);
+}
+
+.ebc-icon {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 0.1rem;
+}
+
+.ebc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ebc-body strong {
+  font-size: 1rem;
+  color: var(--text-h);
+}
+
+.ebc-body p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ── Label hint ── */
+.label-hint {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--text);
+  margin-top: 0.15rem;
+  margin-bottom: 0.4rem;
+}
+

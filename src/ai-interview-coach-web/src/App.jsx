@@ -93,18 +93,18 @@ function App() {
 
   function handleProfileCreated(data) {
     const profile = {
-      id: data.sessionId,
+      id: data.id,
       roleDescription: data.roleDescription,
-      questions: data.questions,
+      questions: data.questions ?? [],
       isSaved: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: data.createdAt ?? new Date().toISOString(),
+      updatedAt: data.updatedAt ?? new Date().toISOString(),
     }
     setProfiles((prev) => [profile, ...prev])
     setActiveProfile(profile)
     setSummary('')
-    setSummaryCount(Math.min(3, data.questions.length || 1))
-    addToast('Profile created — questions generated.')
+    setSummaryCount(1)
+    addToast('Profile created.')
   }
 
   function handleQuestionsAdded(data) {
@@ -451,20 +451,39 @@ function App() {
                 </div>
               </div>
 
-              <div className="questions-list">
-                {activeProfile.questions.map((q) => (
-                  <QuestionRow
-                    key={q.id}
-                    question={q}
-                    sessionId={activeProfile.id}
-                    apiFetch={apiFetch}
-                    onQuestionUpdated={handleQuestionUpdated}
-                    onDelete={handleQuestionDeleted}
-                    onToast={addToast}
-                    viewMode={viewMode}
-                  />
-                ))}
-              </div>
+              {activeProfile.questions.length === 0 ? (
+                <div className="empty-bank-overlays">
+                  <div className="empty-bank-callout">
+                    <span className="ebc-icon">&#x1F4CB;</span>
+                    <div className="ebc-body">
+                      <strong>Your question bank is empty</strong>
+                      <p>Click <strong>+ Add Questions</strong> above to generate AI-tailored questions based on your role, or paste your own.</p>
+                    </div>
+                  </div>
+                  <div className="empty-bank-callout">
+                    <span className="ebc-icon">&#x1F3A4;</span>
+                    <div className="ebc-body">
+                      <strong>Ready to jump straight into practice?</strong>
+                      <p>Switch to <strong>Mock Interview</strong> in the sidebar — it can generate fresh questions on the spot, no question bank needed.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="questions-list">
+                  {activeProfile.questions.map((q) => (
+                    <QuestionRow
+                      key={q.id}
+                      question={q}
+                      sessionId={activeProfile.id}
+                      apiFetch={apiFetch}
+                      onQuestionUpdated={handleQuestionUpdated}
+                      onDelete={handleQuestionDeleted}
+                      onToast={addToast}
+                      viewMode={viewMode}
+                    />
+                  ))}
+                </div>
+              )}
             </>
           )
         ) : (
@@ -503,6 +522,7 @@ function App() {
           onClose={() => setShowAddQuestionsModal(false)}
           profileId={activeProfile.id}
           onQuestionsAdded={handleQuestionsAdded}
+          onGenerating={() => addToast('Generating questions… they\'ll appear shortly.')}
           apiFetch={apiFetch}
         />
       )}

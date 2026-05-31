@@ -1,39 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
-export default function AddQuestionsModal({ isOpen, onClose, profileId, onQuestionsAdded, apiFetch }) {
+export default function AddQuestionsModal({ isOpen, onClose, profileId, onQuestionsAdded, onGenerating, apiFetch }) {
   const [questionCount, setQuestionCount] = useState(3)
   const [manualQuestionText, setManualQuestionText] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
 
-  const manualQuestions = useMemo(
-    () => manualQuestionText.split('\n').map((q) => q.trim()).filter(Boolean),
-    [manualQuestionText],
-  )
-
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault()
     if (!profileId) return
-    setError('')
-    setIsLoading(true)
-
-    try {
-      const data = await apiFetch(`/api/interview/session/${profileId}/questions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          questionCount: Number(questionCount),
-          manualQuestions,
-        }),
-      })
-      onQuestionsAdded(data)
-      setQuestionCount(3)
-      setManualQuestionText('')
-      onClose()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
+    const manualQuestions = manualQuestionText.split('\n').map((q) => q.trim()).filter(Boolean)
+    onGenerating?.()
+    onClose()
+    apiFetch(`/api/interview/session/${profileId}/questions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        questionCount: Number(questionCount),
+        manualQuestions,
+      }),
+    })
+      .then(onQuestionsAdded)
+      .catch(() => {})
+    setQuestionCount(3)
+    setManualQuestionText('')
   }
 
   if (!isOpen) return null
@@ -70,10 +57,8 @@ export default function AddQuestionsModal({ isOpen, onClose, profileId, onQuesti
             />
           </label>
 
-          {error && <p className="error-text">{error}</p>}
-
-          <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading ? 'Adding...' : 'Add Questions'}
+          <button type="submit" className="btn btn-primary">
+            Add Questions
           </button>
         </form>
       </div>

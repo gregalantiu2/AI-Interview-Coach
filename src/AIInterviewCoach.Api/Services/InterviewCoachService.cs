@@ -226,6 +226,41 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             .ToList();
     }
 
+    public async Task<InterviewSession> CreateProfileAsync(CreateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.RoleDescription))
+            throw new ArgumentException("Role description is required.");
+
+        var session = new InterviewSession
+        {
+            RoleDescription = request.RoleDescription.Trim(),
+            Questions = [],
+            IsSaved = true,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        await _repository.UpsertAsync(session, cancellationToken);
+        return session;
+    }
+
+    public async Task SaveAnswerAsync(string sessionId, string questionId, SaveAnswerRequest request, CancellationToken cancellationToken = default)
+    {
+        var session = await _repository.GetAsync(sessionId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profile not found.");
+
+        var question = session.Questions.FirstOrDefault(q => q.Id == questionId)
+            ?? throw new KeyNotFoundException("Question not found.");
+
+        if (request.Answer is not null)
+            question.Answer = request.Answer;
+
+        if (request.Feedback is not null)
+            question.Feedback = request.Feedback;
+
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await _repository.UpsertAsync(session, cancellationToken);
+    }
+
     public async Task<MockQuestionsResponse> GenerateMockQuestionsAsync(MockQuestionsRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.RoleDescription))

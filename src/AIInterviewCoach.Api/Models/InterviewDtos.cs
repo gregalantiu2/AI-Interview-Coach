@@ -1,5 +1,9 @@
 namespace AIInterviewCoach.Api.Models;
 
+public record CreateProfileRequest(string RoleDescription);
+
+public record SaveAnswerRequest(string? Answer = null, string? Feedback = null);
+
 public record GenerateQuestionsRequest(string RoleDescription, int QuestionCount, List<string>? ManualQuestions);
 
 public record GenerateQuestionsResponse(string SessionId, string RoleDescription, IReadOnlyList<InterviewQuestion> Questions);

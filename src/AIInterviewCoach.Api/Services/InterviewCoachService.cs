@@ -309,14 +309,15 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             $"Q{i + 1}: {a.Question}\nA{i + 1}: {a.Answer}"));
 
         var prompt = $"<role>{request.RoleDescription}</role>\n" +
-            "You are an expert interview coach. Evaluate each response in depth.\n" +
+            "You are an expert interview coach. Evaluate each candidate response with the same depth and style as a professional coaching session.\n" +
             "Return a JSON object with exactly these fields:\n" +
             "- \"rating\": integer 1–10 overall performance score\n" +
-            "- \"overallFeedback\": comprehensive coaching narrative covering overall strengths, key improvement areas, and concrete next steps\n" +
+            "- \"overallFeedback\": comprehensive markdown coaching narrative covering overall strengths, recurring improvement areas, and concrete next steps for the candidate's preparation\n" +
             "- \"questionFeedbacks\": array ordered to match the questions above, each object with:\n" +
             "    - \"question\": exact question text (copy verbatim)\n" +
-            "    - \"feedback\": detailed, multi-sentence feedback that (1) notes what the candidate did well, (2) identifies gaps or missed points, and (3) gives a specific, actionable suggestion to improve the answer, referencing the STAR method or relevant best practice where applicable\n" +
-            "Return only valid JSON, no preamble or trailing text.\n" +
+            "    - \"feedback\": rich markdown feedback using this exact structure:\n" +
+            "        **Strengths:**\\n- [bullet points]\\n\\n**Areas for Improvement:**\\n- [bullet points]\\n\\n**Suggestions for Clarification:**\\n- [bullet points]\\n\\nExample revised answer:\\n\\n\\\"[a rewritten version of the answer demonstrating best practices]\\\"\n" +
+            "Return only valid JSON. All markdown content must be properly escaped as JSON strings.\n" +
             $"<interview>\n{qaBlock}\n</interview>";
 
         var response = await _llmClient.CompleteAsync(prompt, cancellationToken);

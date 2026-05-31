@@ -96,8 +96,8 @@ export default function MockInterviewConfig({ activeProfile, onStart }) {
             <span className="mock-source-label">Voice</span>
             <div className="mock-voice-options">
               {[
-                { value: 'female', label: '\u2640 Female' },
-                { value: 'male', label: '\u2642 Male' },
+                { value: 'female', label: '♀ Female' },
+                { value: 'male', label: '♂ Male' },
               ].map((opt) => (
                 <button
                   key={opt.value}

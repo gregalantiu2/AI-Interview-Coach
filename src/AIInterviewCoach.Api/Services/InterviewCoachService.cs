@@ -309,11 +309,14 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             $"Q{i + 1}: {a.Question}\nA{i + 1}: {a.Answer}"));
 
         var prompt = $"<role>{request.RoleDescription}</role>\n" +
-            "You are an interview coach. Review the following mock interview responses and return a JSON object with:\n" +
-            "- \"rating\": integer 1-10 overall score\n" +
-            "- \"overallFeedback\": string with overall coaching feedback\n" +
-            "- \"questionFeedbacks\": array of objects with \"question\" and \"feedback\" fields\n" +
-            "Return only valid JSON.\n" +
+            "You are an expert interview coach. Evaluate each response in depth.\n" +
+            "Return a JSON object with exactly these fields:\n" +
+            "- \"rating\": integer 1–10 overall performance score\n" +
+            "- \"overallFeedback\": comprehensive coaching narrative covering overall strengths, key improvement areas, and concrete next steps\n" +
+            "- \"questionFeedbacks\": array ordered to match the questions above, each object with:\n" +
+            "    - \"question\": exact question text (copy verbatim)\n" +
+            "    - \"feedback\": detailed, multi-sentence feedback that (1) notes what the candidate did well, (2) identifies gaps or missed points, and (3) gives a specific, actionable suggestion to improve the answer, referencing the STAR method or relevant best practice where applicable\n" +
+            "Return only valid JSON, no preamble or trailing text.\n" +
             $"<interview>\n{qaBlock}\n</interview>";
 
         var response = await _llmClient.CompleteAsync(prompt, cancellationToken);

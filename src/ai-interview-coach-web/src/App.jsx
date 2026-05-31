@@ -334,51 +334,56 @@ function App() {
     }
 
     // Add new questions to bank and save their answers too
-    if (newQTexts.length > 0 && profileId) {
-      apiFetch(`/api/interview/session/${profileId}/questions`, {
-        method: 'POST',
-        body: JSON.stringify({ questionCount: 0, manualQuestions: newQTexts }),
-      })
-        .then((data) => {
-          applyQuestionsAdded(profileId, data.allQuestions)
-          for (const q of data.newQuestions) {
-            bankIdMap.set(q.text, q.id)
-            const ans = answersByText.get(q.text)
-            if (ans?.trim()) {
-              apiFetch(`/api/interview/session/${profileId}/question/${q.id}/answer`, {
-                method: 'PATCH',
-                body: JSON.stringify({ answer: ans }),
-              }).then(applyQuestionUpdate).catch(() => {})
-            }
-          }
+    const addQuestionsPromise = (newQTexts.length > 0 && profileId)
+      ? apiFetch(`/api/interview/session/${profileId}/questions`, {
+          method: 'POST',
+          body: JSON.stringify({ questionCount: 0, manualQuestions: newQTexts }),
         })
-        .catch(() => {})
-    }
+          .then((data) => {
+            applyQuestionsAdded(profileId, data.allQuestions)
+            for (const q of data.newQuestions) {
+              bankIdMap.set(q.text, q.id)
+              const ans = answersByText.get(q.text)
+              if (ans?.trim()) {
+                apiFetch(`/api/interview/session/${profileId}/question/${q.id}/answer`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ answer: ans }),
+                }).then(applyQuestionUpdate).catch(() => {})
+              }
+            }
+          })
+          .catch(() => {})
+      : Promise.resolve()
 
-    // Generate feedback
-    apiFetch('/api/interview/mock/feedback', {
-      method: 'POST',
-      body: JSON.stringify({
-        roleDescription,
-        answers: answers.map((a) => ({ question: a.question, answer: a.answer })),
+    // Generate feedback — wait for addQuestionsPromise so bankIdMap has new question IDs
+    Promise.all([
+      apiFetch('/api/interview/mock/feedback', {
+        method: 'POST',
+        body: JSON.stringify({
+          roleDescription,
+          answers: answers.map((a) => ({ question: a.question, answer: a.answer })),
+        }),
       }),
-    })
-      .then((data) => {
+      addQuestionsPromise,
+    ])
+      .then(([data]) => {
         setMockFeedback(data)
         setMockFeedbackStatus('ready')
         setMockState('results')
         addToast('Interview feedback is ready!')
-        // Save per-question feedback back to the bank
+        // Save per-question feedback back to the bank.
+        // Match by index position (not by question text — the LLM may slightly rephrase it).
         if (profileId && data.questionFeedbacks?.length) {
-          for (const qf of data.questionFeedbacks) {
-            const qId = bankIdMap.get(qf.question)
-            if (qId && qf.feedback?.trim()) {
-              apiFetch(`/api/interview/session/${profileId}/question/${qId}/answer`, {
-                method: 'PATCH',
-                body: JSON.stringify({ feedback: qf.feedback }),
-              }).then(applyQuestionUpdate).catch(() => {})
-            }
-          }
+          answers.forEach((a, i) => {
+            const qf = data.questionFeedbacks[i]
+            if (!qf?.feedback?.trim()) return
+            const qId = bankIdMap.get(a.question)
+            if (!qId) return
+            apiFetch(`/api/interview/session/${profileId}/question/${qId}/answer`, {
+              method: 'PATCH',
+              body: JSON.stringify({ feedback: qf.feedback }),
+            }).then(applyQuestionUpdate).catch(() => {})
+          })
         }
       })
       .catch((error) => {
@@ -544,7 +549,7 @@ function App() {
                   ) : (
                     <div className="role-summary-view">
                       <span className="role-summary-text">
-                        {activeProfile.roleSummary || <em className="placeholder-text">No summary \u2014 add one to improve question targeting.</em>}
+                        {activeProfile.roleSummary || <em className="placeholder-text">No summary — add one to improve question targeting.</em>}
                       </span>
                       <button
                         type="button"
@@ -553,7 +558,7 @@ function App() {
                         title="Edit role summary"
                         aria-label="Edit role summary"
                       >
-                        \u270F
+                        ✏
                       </button>
                     </div>
                   )}

@@ -1,10 +1,13 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import NewSessionModal from './components/NewSessionModal.jsx'
 import AddQuestionsModal from './components/AddQuestionsModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import QuestionRow from './components/QuestionRow.jsx'
 import ExportButton from './components/ExportButton.jsx'
+import MockInterviewConfig from './components/MockInterviewConfig.jsx'
+import MockInterviewSession from './components/MockInterviewSession.jsx'
+import MockInterviewResults from './components/MockInterviewResults.jsx'
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000').replace(/\/$/, '')
 
@@ -33,6 +36,32 @@ function App() {
   const [summaryCount, setSummaryCount] = useState(3)
   const [toasts, setToasts] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+
+  // Sidebar
+  const [activeMode, setActiveMode] = useState('question-bank')
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false)
+  const profileDropdownRef = useRef(null)
+
+  // Mock interview
+  const [mockState, setMockState] = useState('config')
+  const [mockConfig, setMockConfig] = useState({ questionCount: 5, source: 'new', audioEnabled: false })
+  const [mockQuestions, setMockQuestions] = useState([])
+  const [mockNewQuestionTexts, setMockNewQuestionTexts] = useState([])
+  const [mockAnswers, setMockAnswers] = useState([])
+  const [mockFeedback, setMockFeedback] = useState(null)
+  const [mockFeedbackStatus, setMockFeedbackStatus] = useState('idle')
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    if (!isProfileDropdownOpen) return
+    function handleClickOutside(e) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setIsProfileDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isProfileDropdownOpen])
 
   function addToast(message) {
     const id = Date.now() + Math.random()
@@ -75,7 +104,7 @@ function App() {
     setActiveProfile(profile)
     setSummary('')
     setSummaryCount(Math.min(3, data.questions.length || 1))
-    setStatus('Profile created — questions generated.')
+    addToast('Profile created — questions generated.')
   }
 
   function handleQuestionsAdded(data) {
@@ -86,6 +115,15 @@ function App() {
       ),
     )
     addToast(`${data.newQuestions.length} question(s) added.`)
+  }
+
+  function applyQuestionsAdded(profileId, allQuestions) {
+    setProfiles((prev) =>
+      prev.map((p) => (p.id === profileId ? { ...p, questions: allQuestions } : p)),
+    )
+    setActiveProfile((prev) =>
+      prev?.id === profileId ? { ...prev, questions: allQuestions } : prev,
+    )
   }
 
   function handleQuestionUpdated(updatedQuestion, statusMessage = 'Feedback received.') {
@@ -152,6 +190,114 @@ function App() {
     setActiveProfile(profile)
     setSummary('')
     setSummaryCount(Math.min(3, profile.questions.length || 1))
+    setIsProfileDropdownOpen(false)
+  }
+
+  // ── Mock interview handlers ──
+  async function handleMockStart(config) {
+    setMockConfig(config)
+    const existingQs = activeProfile?.questions ?? []
+    let questions = []
+    let newQuestionTexts = []
+
+    if (config.source === 'existing') {
+      const shuffled = [...existingQs].sort(() => Math.random() - 0.5)
+      questions = shuffled.slice(0, config.questionCount).map((q) => q.text)
+    } else if (config.source === 'new') {
+      try {
+        const data = await apiFetch('/api/interview/mock/questions', {
+          method: 'POST',
+          body: JSON.stringify({
+            roleDescription: activeProfile?.roleDescription ?? '',
+            questionCount: config.questionCount,
+          }),
+        })
+        questions = data.questions
+        newQuestionTexts = data.questions
+      } catch (error) {
+        addToast(`Failed to generate questions: ${error.message}`)
+        return
+      }
+    } else {
+      // mix: split count between existing and new
+      const existingCount = Math.min(Math.floor(config.questionCount / 2), existingQs.length)
+      const newCount = config.questionCount - existingCount
+      const shuffled = [...existingQs].sort(() => Math.random() - 0.5)
+      const existingPicked = shuffled.slice(0, existingCount).map((q) => q.text)
+      if (newCount > 0) {
+        try {
+          const data = await apiFetch('/api/interview/mock/questions', {
+            method: 'POST',
+            body: JSON.stringify({
+              roleDescription: activeProfile?.roleDescription ?? '',
+              questionCount: newCount,
+            }),
+          })
+          newQuestionTexts = data.questions
+          questions = [...existingPicked, ...data.questions]
+        } catch (error) {
+          addToast(`Failed to generate questions: ${error.message}`)
+          return
+        }
+      } else {
+        questions = existingPicked
+      }
+    }
+
+    setMockQuestions(questions)
+    setMockNewQuestionTexts(newQuestionTexts)
+    setMockAnswers([])
+    setMockFeedback(null)
+    setMockFeedbackStatus('idle')
+    setMockState('running')
+  }
+
+  function handleMockComplete(answers) {
+    setMockAnswers(answers)
+    setMockState('awaiting-feedback')
+    setMockFeedbackStatus('pending')
+
+    const profileId = activeProfile?.id
+    const roleDescription = activeProfile?.roleDescription ?? ''
+    const newQTexts = mockNewQuestionTexts
+
+    // Auto-add new questions to the active profile (silent — no toast)
+    if (newQTexts.length > 0 && profileId) {
+      apiFetch(`/api/interview/session/${profileId}/questions`, {
+        method: 'POST',
+        body: JSON.stringify({ questionCount: 0, manualQuestions: newQTexts }),
+      })
+        .then((data) => applyQuestionsAdded(profileId, data.allQuestions))
+        .catch(() => {})
+    }
+
+    // Generate feedback — non-blocking so the user can freely navigate away
+    apiFetch('/api/interview/mock/feedback', {
+      method: 'POST',
+      body: JSON.stringify({
+        roleDescription,
+        answers: answers.map((a) => ({ question: a.question, answer: a.answer })),
+      }),
+    })
+      .then((data) => {
+        setMockFeedback(data)
+        setMockFeedbackStatus('ready')
+        setMockState('results')
+        addToast('Interview feedback is ready!')
+      })
+      .catch((error) => {
+        setMockFeedbackStatus('error')
+        addToast(`Feedback failed: ${error.message}`)
+      })
+  }
+
+  function handleMockReset() {
+    setMockState('config')
+    setMockQuestions([])
+    setMockNewQuestionTexts([])
+    setMockAnswers([])
+    setMockFeedback(null)
+    setMockFeedbackStatus('idle')
   }
 
   return (
@@ -170,111 +316,177 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1 className="sidebar-title">AI Interview Coach</h1>
+        </div>
+
+        {/* Profile picker */}
+        <div className="sidebar-profile-section">
+          <span className="sidebar-section-label">Profile</span>
+          <div className="profile-dropdown-row">
+            <div className="profile-dropdown" ref={profileDropdownRef}>
+              <button
+                type="button"
+                className="profile-dropdown-trigger"
+                onClick={() => setIsProfileDropdownOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={isProfileDropdownOpen}
+              >
+                <span className="profile-dropdown-value">
+                  {activeProfile?.roleDescription ?? (profiles.length === 0 ? 'No profiles yet' : 'Select a profile\u2026')}
+                </span>
+                <span className={`chevron ${isProfileDropdownOpen ? 'open' : ''}`}>&#x25BC;</span>
+              </button>
+              {isProfileDropdownOpen && profiles.length > 0 && (
+                <div className="profile-dropdown-menu" role="listbox">
+                  {profiles.map((p) => (
+                    <div
+                      key={p.id}
+                      className={`profile-dropdown-item ${activeProfile?.id === p.id ? 'active' : ''}`}
+                    >
+                      <button
+                        type="button"
+                        className="profile-dropdown-item-btn"
+                        role="option"
+                        aria-selected={activeProfile?.id === p.id}
+                        onClick={() => selectProfile(p)}
+                      >
+                        <span className="profile-name">{p.roleDescription}</span>
+                        <span className="profile-meta">{p.questions.length} questions</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-delete-profile"
+                        onClick={(e) => { e.stopPropagation(); setProfileToDelete(p) }}
+                        aria-label="Delete profile"
+                        title="Delete profile"
+                      >
+                        &#x1F5D1;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm profile-add-btn"
+              onClick={() => setShowNewProfileModal(true)}
+              title="New profile"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Mode navigation */}
+        <nav className="mode-nav" aria-label="App modes">
           <button
             type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() => setShowNewProfileModal(true)}
+            className={`mode-nav-btn ${activeMode === 'question-bank' ? 'active' : ''}`}
+            onClick={() => setActiveMode('question-bank')}
           >
-            + New Profile
+            <span className="mode-nav-icon">&#x1F4CB;</span>
+            Question Bank
           </button>
-        </div>
-        <div className="profile-list">
-          {profiles.length === 0 ? (
-            <p className="sidebar-empty">No profiles yet. Create one to get started.</p>
-          ) : (
-            profiles.map((p) => (
-              <div
-                key={p.id}
-                className={`profile-item ${activeProfile?.id === p.id ? 'profile-item-active' : ''}`}
-              >
-                <button
-                  type="button"
-                  className="profile-item-btn"
-                  onClick={() => selectProfile(p)}
-                >
-                  <span className="profile-name">{p.roleDescription}</span>
-                  <span className="profile-meta">{p.questions.length} questions</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-delete-profile"
-                  onClick={(e) => { e.stopPropagation(); setProfileToDelete(p) }}
-                  aria-label="Delete profile"
-                  title="Delete profile"
-                >
-                  🗑
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+          <button
+            type="button"
+            className={`mode-nav-btn ${activeMode === 'mock-interview' ? 'active' : ''}`}
+            onClick={() => setActiveMode('mock-interview')}
+          >
+            <span className="mode-nav-icon">&#x1F3A4;</span>
+            Mock Interview
+            {mockFeedbackStatus === 'pending' && (
+              <span className="mode-nav-spinner">
+                <span className="spinner" />
+              </span>
+            )}
+          </button>
+        </nav>
       </aside>
 
       {/* â”€â”€ Main content â”€â”€ */}
       <main className="main-content">
-        {!activeProfile ? (
-          <div className="empty-state">
-            <p>Select a profile from the sidebar or create a new one to get started.</p>
-          </div>
-        ) : (
-          <>
-            <div className="main-header">
-              <div>
-                <h2 className="main-title">{activeProfile.roleDescription}</h2>
-                <p className="meta">
-                  {answeredCount}/{activeProfile.questions.length} answered
-                </p>
-              </div>
-              <div className="session-actions">
-                <div className="view-mode-toggle" role="group" aria-label="Question view mode">
-                  <span className="view-mode-label">View:</span>
+        {activeMode === 'question-bank' ? (
+          !activeProfile ? (
+            <div className="empty-state">
+              <p>Select a profile from the dropdown or create a new one to get started.</p>
+            </div>
+          ) : (
+            <>
+              <div className="main-header">
+                <div>
+                  <h2 className="main-title">{activeProfile.roleDescription}</h2>
+                  <p className="meta">
+                    {answeredCount}/{activeProfile.questions.length} answered
+                  </p>
+                </div>
+                <div className="session-actions">
+                  <div className="view-mode-toggle" role="group" aria-label="Question view mode">
+                    <span className="view-mode-label">View:</span>
+                    <button
+                      type="button"
+                      className={`view-mode-btn ${viewMode === 'modal' ? 'active' : ''}`}
+                      onClick={() => handleViewModeChange('modal')}
+                    >
+                      Pop-up
+                    </button>
+                    <button
+                      type="button"
+                      className={`view-mode-btn ${viewMode === 'expand' ? 'active' : ''}`}
+                      onClick={() => handleViewModeChange('expand')}
+                    >
+                      Expand
+                    </button>
+                  </div>
+                  <ExportButton
+                    questions={activeProfile.questions}
+                    roleDescription={activeProfile.roleDescription}
+                  />
                   <button
                     type="button"
-                    className={`view-mode-btn ${viewMode === 'modal' ? 'active' : ''}`}
-                    onClick={() => handleViewModeChange('modal')}
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowAddQuestionsModal(true)}
                   >
-                    Pop-up
-                  </button>
-                  <button
-                    type="button"
-                    className={`view-mode-btn ${viewMode === 'expand' ? 'active' : ''}`}
-                    onClick={() => handleViewModeChange('expand')}
-                  >
-                    Expand
+                    + Add Questions
                   </button>
                 </div>
-                <ExportButton
-                  questions={activeProfile.questions}
-                  roleDescription={activeProfile.roleDescription}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setShowAddQuestionsModal(true)}
-                >
-                  + Add Questions
-                </button>
               </div>
-            </div>
 
-            {status && <p className="status-text">{status}</p>}
-
-            <div className="questions-list">
-              {activeProfile.questions.map((q) => (
-                <QuestionRow
-                  key={q.id}
-                  question={q}
-                  sessionId={activeProfile.id}
-                  apiFetch={apiFetch}
-                  onQuestionUpdated={handleQuestionUpdated}
-                  onDelete={handleQuestionDeleted}
-                  onToast={addToast}
-                  viewMode={viewMode}
-                />
-              ))}
-            </div>
-
-          </>
+              <div className="questions-list">
+                {activeProfile.questions.map((q) => (
+                  <QuestionRow
+                    key={q.id}
+                    question={q}
+                    sessionId={activeProfile.id}
+                    apiFetch={apiFetch}
+                    onQuestionUpdated={handleQuestionUpdated}
+                    onDelete={handleQuestionDeleted}
+                    onToast={addToast}
+                    viewMode={viewMode}
+                  />
+                ))}
+              </div>
+            </>
+          )
+        ) : (
+          mockState === 'running' ? (
+            <MockInterviewSession
+              questions={mockQuestions}
+              audioEnabled={mockConfig.audioEnabled}
+              onComplete={handleMockComplete}
+            />
+          ) : mockState === 'awaiting-feedback' || mockState === 'results' ? (
+            <MockInterviewResults
+              feedback={mockFeedback}
+              feedbackStatus={mockFeedbackStatus}
+              onReset={handleMockReset}
+              onGoToBank={() => setActiveMode('question-bank')}
+            />
+          ) : (
+            <MockInterviewConfig
+              activeProfile={activeProfile}
+              onStart={handleMockStart}
+            />
+          )
         )}
       </main>
 

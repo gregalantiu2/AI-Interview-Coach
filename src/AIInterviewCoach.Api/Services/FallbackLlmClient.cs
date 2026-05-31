@@ -17,6 +17,16 @@ public class FallbackLlmClient : ILlmClient
             return Task.FromResult($"[\"{string.Join("\",\"", questions)}\"]");
         }
 
+        if (prompt.Contains("overallFeedback", StringComparison.OrdinalIgnoreCase))
+        {
+            var qCount = Regex.Matches(prompt, @"^Q\d+:", RegexOptions.Multiline).Count;
+            var feedbacks = Enumerable.Range(1, Math.Max(qCount, 1))
+                .Select(i => $"{{\"question\":\"Question {i}\",\"feedback\":\"Good structure. Consider adding specific examples and measurable outcomes.\"}}")
+                .ToArray();
+            var json = $"{{\"rating\":7,\"overallFeedback\":\"Overall a solid performance. Focus on using the STAR method and quantifying your impact to make your answers more compelling.\",\"questionFeedbacks\":[{string.Join(",", feedbacks)}]}}";
+            return Task.FromResult(json);
+        }
+
         if (prompt.Contains("Provide concise, actionable interview feedback", StringComparison.OrdinalIgnoreCase))
         {
             return Task.FromResult("Good structure. Add clearer metrics, trade-offs, and business impact.");

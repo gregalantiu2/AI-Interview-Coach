@@ -173,5 +173,35 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
         }
     }
 
+    [HttpPost("mock/questions")]
+    [EnableRateLimiting("llm")]
+    public async Task<ActionResult<MockQuestionsResponse>> GenerateMockQuestions([FromBody] MockQuestionsRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _service.GenerateMockQuestionsAsync(request, cancellationToken);
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("mock/feedback")]
+    [EnableRateLimiting("llm")]
+    public async Task<ActionResult<MockFeedbackResponse>> GenerateMockFeedback([FromBody] MockFeedbackRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _service.GenerateMockFeedbackAsync(request, cancellationToken);
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     private static bool IsValidSessionId(string sessionId) => Guid.TryParse(sessionId, out _);
 }

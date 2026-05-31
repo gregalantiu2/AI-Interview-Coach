@@ -225,4 +225,71 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Length > 5 && !x.StartsWith('[') && !x.StartsWith(']'))
             .ToList();
     }
+
+    public async Task<MockQuestionsResponse> GenerateMockQuestionsAsync(MockQuestionsRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.RoleDescription))
+            throw new ArgumentException("Role description is required.");
+
+        if (request.QuestionCount <= 0)
+            throw new ArgumentException("Question count must be greater than zero.");
+
+        var prompt = $"Generate {request.QuestionCount} interview questions for the following role. Return only a JSON array of question strings.\n<role>{request.RoleDescription}</role>";
+        var response = await _llmClient.CompleteAsync(prompt, cancellationToken);
+        var questions = ParseQuestions(response).Take(request.QuestionCount).ToList();
+        return new MockQuestionsResponse(questions);
+    }
+
+    public async Task<MockFeedbackResponse> GenerateMockFeedbackAsync(MockFeedbackRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Answers is null || request.Answers.Count == 0)
+            throw new ArgumentException("At least one answer is required.");
+
+        var qaBlock = string.Join("\n\n", request.Answers.Select((a, i) =>
+            $"Q{i + 1}: {a.Question}\nA{i + 1}: {a.Answer}"));
+
+        var prompt = $"<role>{request.RoleDescription}</role>\n" +
+            "You are an interview coach. Review the following mock interview responses and return a JSON object with:\n" +
+            "- \"rating\": integer 1-10 overall score\n" +
+            "- \"overallFeedback\": string with overall coaching feedback\n" +
+            "- \"questionFeedbacks\": array of objects with \"question\" and \"feedback\" fields\n" +
+            "Return only valid JSON.\n" +
+            $"<interview>\n{qaBlock}\n</interview>";
+
+        var response = await _llmClient.CompleteAsync(prompt, cancellationToken);
+        return ParseMockFeedback(response, request.Answers);
+    }
+
+    private static MockFeedbackResponse ParseMockFeedback(string content, List<MockAnswerDto> answers)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return new MockFeedbackResponse(5, "No feedback available.", []);
+
+        var objStart = content.IndexOf('{');
+        var objEnd = content.LastIndexOf('}');
+
+        if (objStart >= 0 && objEnd > objStart)
+        {
+            var jsonSlice = content[objStart..(objEnd + 1)];
+            try
+            {
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var parsed = JsonSerializer.Deserialize<MockFeedbackJsonRaw>(jsonSlice, options);
+                if (parsed is not null)
+                {
+                    var qFeedbacks = parsed.QuestionFeedbacks?
+                        .Select(x => new MockQuestionFeedback(x.Question ?? string.Empty, x.Feedback ?? string.Empty))
+                        .ToList() ?? [];
+                    return new MockFeedbackResponse(Math.Clamp(parsed.Rating, 1, 10), parsed.OverallFeedback ?? string.Empty, qFeedbacks);
+                }
+            }
+            catch (JsonException) { }
+        }
+
+        return new MockFeedbackResponse(5, content.Trim(), answers.Select(a => new MockQuestionFeedback(a.Question, string.Empty)).ToList());
+    }
+
+    private record MockFeedbackJsonRaw(int Rating, string? OverallFeedback, List<MockQuestionFeedbackRaw>? QuestionFeedbacks);
+
+    private record MockQuestionFeedbackRaw(string? Question, string? Feedback);
 }

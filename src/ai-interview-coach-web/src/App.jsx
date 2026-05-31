@@ -88,7 +88,11 @@ function App() {
   const loadProfiles = useCallback(async () => {
     try {
       const data = await apiFetch('/api/interview/profiles')
-      setProfiles(data)
+      // Normalize roleName for profiles created before the field was added
+      setProfiles(data.map((p) => ({
+        ...p,
+        roleName: p.roleName || p.roleDescription?.split('\n')[0] || '',
+      })))
     } catch {
       // keep UI interactive even when API is unavailable
     }
@@ -222,9 +226,19 @@ function App() {
         method: 'PATCH',
         body: JSON.stringify({ roleSummary: editSummaryText.trim() }),
       })
-      const updated = { ...activeProfile, roleSummary: data.roleSummary, roleDescription: data.roleDescription }
+      const updated = {
+        ...activeProfile,
+        roleName: data.roleName || activeProfile.roleName,
+        roleSummary: data.roleSummary,
+        roleDescription: data.roleDescription,
+      }
       setActiveProfile(updated)
-      setProfiles((prev) => prev.map((p) => p.id === updated.id ? { ...p, roleSummary: updated.roleSummary, roleDescription: updated.roleDescription } : p))
+      setProfiles((prev) => prev.map((p) => p.id === updated.id ? {
+        ...p,
+        roleName: updated.roleName,
+        roleSummary: updated.roleSummary,
+        roleDescription: updated.roleDescription,
+      } : p))
       setEditingSummary(false)
       addToast('Role summary updated.')
     } catch (error) {
@@ -525,7 +539,7 @@ function App() {
                         value={editSummaryText}
                         onChange={(e) => setEditSummaryText(e.target.value)}
                         rows={3}
-                        placeholder="Describe the role in detail to improve AI question targeting\u2026"
+                        placeholder="Describe the role in detail to improve AI question targeting…"
                       />
                       <div className="role-summary-editor-actions">
                         <button
@@ -534,7 +548,7 @@ function App() {
                           onClick={handleSaveSummary}
                           disabled={isSavingSummary}
                         >
-                          {isSavingSummary ? 'Saving\u2026' : 'Save Summary'}
+                          {isSavingSummary ? 'Saving…' : 'Save Summary'}
                         </button>
                         <button
                           type="button"
@@ -558,7 +572,7 @@ function App() {
                         title="Edit role summary"
                         aria-label="Edit role summary"
                       >
-                        ✏
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
                     </div>
                   )}

@@ -1027,9 +1027,14 @@ textarea {
 .main-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.main-header > div:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .main-title {
@@ -1578,6 +1583,7 @@ textarea {
   border-color: var(--border) !important;
   border-top-color: var(--accent) !important;
   border-width: 3px !important;
+  margin-left: 0;
 }
 
 .mock-results-pending p {
@@ -1804,6 +1810,7 @@ textarea {
   font-size: 0.875rem;
   line-height: 1.5;
   box-sizing: border-box;
+  min-width: 0;
 }
 
 .role-summary-textarea:focus {

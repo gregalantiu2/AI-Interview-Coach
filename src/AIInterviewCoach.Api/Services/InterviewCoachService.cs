@@ -69,7 +69,14 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
         question.Answer = request.Answer.Trim();
         question.AnsweredAt = DateTimeOffset.UtcNow;
         question.Feedback = await _llmClient.CompleteAsync(
-            $"<role>{session.RoleDescription}</role>\n<question>{question.Text}</question>\n<answer>{question.Answer}</answer>\nProvide concise, actionable interview feedback.",
+            $"<role>{session.RoleDescription}</role>\n<question>{question.Text}</question>\n<answer>{question.Answer}</answer>\n" +
+            "You are an expert interview coach. Provide detailed, actionable feedback on the answer above.\n" +
+            "Do not include any introduction, preamble, or closing sentence. Start directly with the feedback structure below.\n" +
+            "Use this exact markdown structure:\n" +
+            "**Strengths:**\n- (bullet points)\n\n" +
+            "**Areas for Improvement:**\n- (bullet points)\n\n" +
+            "**Suggestions for Next Steps:**\n- (bullet points)\n\n" +
+            "Example revised answer:\n\n\"(a rewritten version of the answer demonstrating best practices)\"",
             cancellationToken);
 
         session.UpdatedAt = DateTimeOffset.UtcNow;
@@ -309,14 +316,14 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             $"Q{i + 1}: {a.Question}\nA{i + 1}: {a.Answer}"));
 
         var prompt = $"<role>{request.RoleDescription}</role>\n" +
-            "You are an expert interview coach. Evaluate each candidate response.\n" +
+            "You are an expert interview coach. Evaluate each candidate response with the same depth and detail as a professional one-on-one coaching session.\n" +
             "Return a JSON object with EXACTLY these three fields and nothing else:\n" +
             "\"rating\": integer 1-10 overall score.\n" +
             "\"overallFeedback\": a high-level markdown coaching summary (3-5 sentences ONLY). Do NOT repeat or recap individual questions here. Cover overall themes, patterns, and 2-3 concrete preparation steps.\n" +
             "\"questionFeedbacks\": array with one entry per question, in the same order as above. Each entry has \"question\" (copy verbatim) and \"feedback\" (rich markdown).\n" +
-            "The feedback markdown for EACH question MUST follow this exact structure:\n" +
-            "**Strengths:**\n- bullet\n\n**Areas for Improvement:**\n- bullet\n\n**Suggestions:**\n- bullet\n\nExample revised answer:\n\n\"rewritten answer\"\n" +
-            "Return only valid JSON with all markdown properly escaped. Do not include any text outside the JSON object.\n" +
+            "The feedback markdown for EACH question MUST follow this exact structure — do NOT include any preamble or introduction, start directly with **Strengths:**:\n" +
+            "**Strengths:**\n- (detailed bullet points with specific observations)\n\n**Areas for Improvement:**\n- (detailed bullet points)\n\n**Suggestions for Next Steps:**\n- (detailed bullet points)\n\nExample revised answer:\n\n\"(a fully rewritten version of the answer demonstrating best practices, using specific language and metrics where possible)\"\n" +
+            "Return only valid JSON with all markdown properly escaped as JSON strings. Do not include any text outside the JSON object.\n" +
             $"<interview>\n{qaBlock}\n</interview>";
 
         var response = await _llmClient.CompleteAsync(prompt, cancellationToken);

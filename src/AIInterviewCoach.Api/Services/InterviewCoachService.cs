@@ -309,15 +309,14 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
             $"Q{i + 1}: {a.Question}\nA{i + 1}: {a.Answer}"));
 
         var prompt = $"<role>{request.RoleDescription}</role>\n" +
-            "You are an expert interview coach. Evaluate each candidate response with the same depth and style as a professional coaching session.\n" +
-            "Return a JSON object with exactly these fields:\n" +
-            "- \"rating\": integer 1–10 overall performance score\n" +
-            "- \"overallFeedback\": comprehensive markdown coaching narrative covering overall strengths, recurring improvement areas, and concrete next steps for the candidate's preparation\n" +
-            "- \"questionFeedbacks\": array ordered to match the questions above, each object with:\n" +
-            "    - \"question\": exact question text (copy verbatim)\n" +
-            "    - \"feedback\": rich markdown feedback using this exact structure:\n" +
-            "        **Strengths:**\\n- [bullet points]\\n\\n**Areas for Improvement:**\\n- [bullet points]\\n\\n**Suggestions for Clarification:**\\n- [bullet points]\\n\\nExample revised answer:\\n\\n\\\"[a rewritten version of the answer demonstrating best practices]\\\"\n" +
-            "Return only valid JSON. All markdown content must be properly escaped as JSON strings.\n" +
+            "You are an expert interview coach. Evaluate each candidate response.\n" +
+            "Return a JSON object with EXACTLY these three fields and nothing else:\n" +
+            "\"rating\": integer 1-10 overall score.\n" +
+            "\"overallFeedback\": a high-level markdown coaching summary (3-5 sentences ONLY). Do NOT repeat or recap individual questions here. Cover overall themes, patterns, and 2-3 concrete preparation steps.\n" +
+            "\"questionFeedbacks\": array with one entry per question, in the same order as above. Each entry has \"question\" (copy verbatim) and \"feedback\" (rich markdown).\n" +
+            "The feedback markdown for EACH question MUST follow this exact structure:\n" +
+            "**Strengths:**\n- bullet\n\n**Areas for Improvement:**\n- bullet\n\n**Suggestions:**\n- bullet\n\nExample revised answer:\n\n\"rewritten answer\"\n" +
+            "Return only valid JSON with all markdown properly escaped. Do not include any text outside the JSON object.\n" +
             $"<interview>\n{qaBlock}\n</interview>";
 
         var response = await _llmClient.CompleteAsync(prompt, cancellationToken);

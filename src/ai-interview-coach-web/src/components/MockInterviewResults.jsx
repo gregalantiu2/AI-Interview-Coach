@@ -2,7 +2,17 @@ import { useState } from 'react'
 import { marked } from 'marked'
 
 export default function MockInterviewResults({ feedback, feedbackStatus, onReset, onGoToBank }) {
-  const [expandedQ, setExpandedQ] = useState(null)
+  const initialExpanded = () =>
+    new Set((feedback?.questionFeedbacks ?? []).map((_, i) => i))
+  const [expandedQ, setExpandedQ] = useState(initialExpanded)
+
+  function toggleQ(i) {
+    setExpandedQ((prev) => {
+      const next = new Set(prev)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
 
   if (feedbackStatus === 'pending' || feedbackStatus === 'idle') {
     return (
@@ -54,14 +64,14 @@ export default function MockInterviewResults({ feedback, feedbackStatus, onReset
               <button
                 type="button"
                 className="mock-qf-toggle"
-                onClick={() => setExpandedQ(expandedQ === i ? null : i)}
-                aria-expanded={expandedQ === i}
+                onClick={() => toggleQ(i)}
+                aria-expanded={expandedQ.has(i)}
               >
                 <span className="mock-qf-num">Q{i + 1}</span>
                 <span className="mock-qf-question">{qf.question}</span>
-                <span className={`chevron ${expandedQ === i ? 'open' : ''}`}>&#x25BC;</span>
+                <span className={`chevron ${expandedQ.has(i) ? 'open' : ''}`}>&#x25BC;</span>
               </button>
-              {expandedQ === i && qf.feedback && (
+              {expandedQ.has(i) && qf.feedback && (
                 <div
                   className="mock-qf-feedback feedback-content"
                   dangerouslySetInnerHTML={{ __html: marked.parse(qf.feedback) }}

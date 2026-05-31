@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using AIInterviewCoach.Api.Infrastructure;
+using Scalar.AspNetCore;
 using AIInterviewCoach.Api.Repositories;
 using AIInterviewCoach.Api.Services;
 using Microsoft.AspNetCore.RateLimiting;
@@ -31,7 +32,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Llm:ApiKey"]) ||
 else
 {
     builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>()
-        .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));
+        .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(300));
 }
 
 builder.Services.AddScoped<InterviewCoachService>();
@@ -118,6 +119,7 @@ if (!string.IsNullOrWhiteSpace(cosmosEndpoint) && !string.IsNullOrWhiteSpace(cos
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();

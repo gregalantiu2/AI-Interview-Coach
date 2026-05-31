@@ -12,5 +12,7 @@ public class InterviewQuestion
 
     public string? Feedback { get; set; }
 
+    public string? Tips { get; set; }
+
     public DateTimeOffset? AnsweredAt { get; set; }
 }

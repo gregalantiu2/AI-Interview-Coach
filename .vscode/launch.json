@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (http)",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/src/AIInterviewCoach.Api/AIInterviewCoach.Api.csproj",
+      "launchSettingsProfile": "http",
+      "serverReadyAction": {
+        "action": "startDebugging",
+        "pattern": "Now listening on: (https?://\\S+)",
+        "name": "Web (Vite)"
+      }
+    },
+    {
+      "name": "Web (Vite)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "preLaunchTask": "Start Vite Dev Server",
+      "webRoot": "${workspaceFolder}/src/ai-interview-coach-web/src"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack",
+      "configurations": ["API (http)"],
+      "stopAll": true
+    }
+  ]
+}

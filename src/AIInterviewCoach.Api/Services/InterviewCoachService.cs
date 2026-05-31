@@ -228,12 +228,20 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
 
     public async Task<InterviewSession> CreateProfileAsync(CreateProfileRequest request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.RoleDescription))
-            throw new ArgumentException("Role description is required.");
+        if (string.IsNullOrWhiteSpace(request.RoleName))
+            throw new ArgumentException("Role name is required.");
+
+        var roleName = request.RoleName.Trim();
+        var roleSummary = request.RoleSummary?.Trim() ?? string.Empty;
+        var roleDescription = string.IsNullOrWhiteSpace(roleSummary)
+            ? roleName
+            : roleName + "\n\n" + roleSummary;
 
         var session = new InterviewSession
         {
-            RoleDescription = request.RoleDescription.Trim(),
+            RoleName = roleName,
+            RoleSummary = roleSummary,
+            RoleDescription = roleDescription,
             Questions = [],
             IsSaved = true,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -243,7 +251,23 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
         return session;
     }
 
-    public async Task SaveAnswerAsync(string sessionId, string questionId, SaveAnswerRequest request, CancellationToken cancellationToken = default)
+    public async Task<InterviewSession> UpdateProfileSummaryAsync(string sessionId, UpdateProfileSummaryRequest request, CancellationToken cancellationToken = default)
+    {
+        var session = await _repository.GetAsync(sessionId, cancellationToken)
+            ?? throw new KeyNotFoundException("Profile not found.");
+
+        var roleSummary = request.RoleSummary?.Trim() ?? string.Empty;
+        session.RoleSummary = roleSummary;
+        session.RoleDescription = string.IsNullOrWhiteSpace(roleSummary)
+            ? session.RoleName
+            : session.RoleName + "\n\n" + roleSummary;
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _repository.UpsertAsync(session, cancellationToken);
+        return session;
+    }
+
+    public async Task<InterviewQuestion> SaveAnswerAsync(string sessionId, string questionId, SaveAnswerRequest request, CancellationToken cancellationToken = default)
     {
         var session = await _repository.GetAsync(sessionId, cancellationToken)
             ?? throw new KeyNotFoundException("Profile not found.");
@@ -259,6 +283,7 @@ public class InterviewCoachService(ILlmClient llmClient, IInterviewSessionReposi
 
         session.UpdatedAt = DateTimeOffset.UtcNow;
         await _repository.UpsertAsync(session, cancellationToken);
+        return question;
     }
 
     public async Task<MockQuestionsResponse> GenerateMockQuestionsAsync(MockQuestionsRequest request, CancellationToken cancellationToken = default)

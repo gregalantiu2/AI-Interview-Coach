@@ -1451,6 +1451,33 @@ textarea {
   color: var(--text);
 }
 
+.mock-voice-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mock-voice-btn {
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mock-voice-btn:hover {
+  border-color: var(--accent);
+}
+
+.mock-voice-btn.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .mock-config-footer {
   display: flex;
   flex-direction: column;
@@ -1724,5 +1751,68 @@ textarea {
   color: var(--text);
   margin-top: 0.15rem;
   margin-bottom: 0.4rem;
+}
+
+/* ── Role summary inline editor ── */
+.role-summary-view {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.role-summary-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+  color: var(--text);
+  opacity: 0.6;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+  background: var(--accent-bg);
+}
+
+.role-summary-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.role-summary-textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.role-summary-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.role-summary-editor-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 

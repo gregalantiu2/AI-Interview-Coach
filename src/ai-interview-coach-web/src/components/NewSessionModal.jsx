@@ -16,7 +16,7 @@ export default function NewSessionModal({ isOpen, onClose, onSessionCreated, api
     try {
       const data = await apiFetch('/api/interview/profiles', {
         method: 'POST',
-        body: JSON.stringify({ roleDescription }),
+        body: JSON.stringify({ roleName: roleName.trim(), roleSummary: roleSummary.trim() }),
       })
       onSessionCreated(data)
       setRoleName('')

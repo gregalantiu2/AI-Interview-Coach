@@ -50,6 +50,13 @@ function App() {
   const [mockAnswers, setMockAnswers] = useState([])
   const [mockFeedback, setMockFeedback] = useState(null)
   const [mockFeedbackStatus, setMockFeedbackStatus] = useState('idle')
+  // Tracks questionText → bankQuestionId for all questions answered in the mock
+  const mockBankIdMapRef = useRef(new Map())
+
+  // Role summary inline editing
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [editSummaryText, setEditSummaryText] = useState('')
+  const [isSavingSummary, setIsSavingSummary] = useState(false)
 
   // Close profile dropdown when clicking outside
   useEffect(() => {
@@ -94,6 +101,8 @@ function App() {
   function handleProfileCreated(data) {
     const profile = {
       id: data.id,
+      roleName: data.roleName || data.roleDescription?.split('\n')[0] || '',
+      roleSummary: data.roleSummary ?? '',
       roleDescription: data.roleDescription,
       questions: data.questions ?? [],
       isSaved: true,
@@ -127,10 +136,13 @@ function App() {
   }
 
   function handleQuestionUpdated(updatedQuestion, statusMessage = 'Feedback received.') {
-    setActiveProfile((prev) => ({
-      ...prev,
-      questions: prev.questions.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q)),
-    }))
+    const patch = (qs) => qs.map((q) => (q.id === updatedQuestion.id ? updatedQuestion : q))
+    setActiveProfile((prev) => prev ? { ...prev, questions: patch(prev.questions) } : prev)
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === activeProfile?.id ? { ...p, questions: patch(p.questions) } : p,
+      ),
+    )
     addToast(statusMessage)
   }
 
@@ -191,6 +203,35 @@ function App() {
     setSummary('')
     setSummaryCount(Math.min(3, profile.questions.length || 1))
     setIsProfileDropdownOpen(false)
+    setEditingSummary(false)
+    // Reset mock state to prevent stale session showing for new profile
+    setMockState('config')
+    setMockQuestions([])
+    setMockNewQuestionTexts([])
+    setMockAnswers([])
+    setMockFeedback(null)
+    setMockFeedbackStatus('idle')
+    mockBankIdMapRef.current = new Map()
+  }
+
+  async function handleSaveSummary() {
+    if (!activeProfile) return
+    setIsSavingSummary(true)
+    try {
+      const data = await apiFetch(`/api/interview/profiles/${activeProfile.id}/summary`, {
+        method: 'PATCH',
+        body: JSON.stringify({ roleSummary: editSummaryText.trim() }),
+      })
+      const updated = { ...activeProfile, roleSummary: data.roleSummary, roleDescription: data.roleDescription }
+      setActiveProfile(updated)
+      setProfiles((prev) => prev.map((p) => p.id === updated.id ? { ...p, roleSummary: updated.roleSummary, roleDescription: updated.roleDescription } : p))
+      setEditingSummary(false)
+      addToast('Role summary updated.')
+    } catch (error) {
+      addToast(`Failed to update summary: ${error.message}`)
+    } finally {
+      setIsSavingSummary(false)
+    }
   }
 
   // ── Mock interview handlers ──
@@ -199,10 +240,13 @@ function App() {
     const existingQs = activeProfile?.questions ?? []
     let questions = []
     let newQuestionTexts = []
+    const bankIdMap = new Map() // questionText → bankQuestionId (existing bank Qs only)
 
     if (config.source === 'existing') {
       const shuffled = [...existingQs].sort(() => Math.random() - 0.5)
-      questions = shuffled.slice(0, config.questionCount).map((q) => q.text)
+      const picked = shuffled.slice(0, config.questionCount)
+      questions = picked.map((q) => q.text)
+      picked.forEach((q) => bankIdMap.set(q.text, q.id))
     } else if (config.source === 'new') {
       try {
         const data = await apiFetch('/api/interview/mock/questions', {
@@ -223,7 +267,8 @@ function App() {
       const existingCount = Math.min(Math.floor(config.questionCount / 2), existingQs.length)
       const newCount = config.questionCount - existingCount
       const shuffled = [...existingQs].sort(() => Math.random() - 0.5)
-      const existingPicked = shuffled.slice(0, existingCount).map((q) => q.text)
+      const existingPicked = shuffled.slice(0, existingCount)
+      existingPicked.forEach((q) => bankIdMap.set(q.text, q.id))
       if (newCount > 0) {
         try {
           const data = await apiFetch('/api/interview/mock/questions', {
@@ -234,16 +279,22 @@ function App() {
             }),
           })
           newQuestionTexts = data.questions
-          questions = [...existingPicked, ...data.questions]
+          questions = [...existingPicked.map((q) => q.text), ...data.questions]
         } catch (error) {
           addToast(`Failed to generate questions: ${error.message}`)
           return
         }
       } else {
-        questions = existingPicked
+        questions = existingPicked.map((q) => q.text)
       }
     }
 
+    if (questions.length === 0) {
+      addToast('No questions were generated. Please try again or check your role description.')
+      return
+    }
+
+    mockBankIdMapRef.current = bankIdMap
     setMockQuestions(questions)
     setMockNewQuestionTexts(newQuestionTexts)
     setMockAnswers([])
@@ -260,18 +311,51 @@ function App() {
     const profileId = activeProfile?.id
     const roleDescription = activeProfile?.roleDescription ?? ''
     const newQTexts = mockNewQuestionTexts
+    const bankIdMap = mockBankIdMapRef.current // questionText → bankQuestionId
+    const answersByText = new Map(answers.map((a) => [a.question, a.answer]))
 
-    // Auto-add new questions to the active profile (silent — no toast)
+    // Helper: sync an updated question into both state trees
+    function applyQuestionUpdate(updatedQ) {
+      if (!updatedQ || !profileId) return
+      const patch = (qs) => qs.map((q) => (q.id === updatedQ.id ? updatedQ : q))
+      setProfiles((prev) => prev.map((p) => p.id === profileId ? { ...p, questions: patch(p.questions) } : p))
+      setActiveProfile((prev) => prev?.id === profileId ? { ...prev, questions: patch(prev.questions) } : prev)
+    }
+
+    // Save answers for EXISTING bank questions answered during the mock
+    for (const [text, qId] of bankIdMap) {
+      const ans = answersByText.get(text)
+      if (ans?.trim() && profileId) {
+        apiFetch(`/api/interview/session/${profileId}/question/${qId}/answer`, {
+          method: 'PATCH',
+          body: JSON.stringify({ answer: ans }),
+        }).then(applyQuestionUpdate).catch(() => {})
+      }
+    }
+
+    // Add new questions to bank and save their answers too
     if (newQTexts.length > 0 && profileId) {
       apiFetch(`/api/interview/session/${profileId}/questions`, {
         method: 'POST',
         body: JSON.stringify({ questionCount: 0, manualQuestions: newQTexts }),
       })
-        .then((data) => applyQuestionsAdded(profileId, data.allQuestions))
+        .then((data) => {
+          applyQuestionsAdded(profileId, data.allQuestions)
+          for (const q of data.newQuestions) {
+            bankIdMap.set(q.text, q.id)
+            const ans = answersByText.get(q.text)
+            if (ans?.trim()) {
+              apiFetch(`/api/interview/session/${profileId}/question/${q.id}/answer`, {
+                method: 'PATCH',
+                body: JSON.stringify({ answer: ans }),
+              }).then(applyQuestionUpdate).catch(() => {})
+            }
+          }
+        })
         .catch(() => {})
     }
 
-    // Generate feedback — non-blocking so the user can freely navigate away
+    // Generate feedback
     apiFetch('/api/interview/mock/feedback', {
       method: 'POST',
       body: JSON.stringify({
@@ -284,6 +368,18 @@ function App() {
         setMockFeedbackStatus('ready')
         setMockState('results')
         addToast('Interview feedback is ready!')
+        // Save per-question feedback back to the bank
+        if (profileId && data.questionFeedbacks?.length) {
+          for (const qf of data.questionFeedbacks) {
+            const qId = bankIdMap.get(qf.question)
+            if (qId && qf.feedback?.trim()) {
+              apiFetch(`/api/interview/session/${profileId}/question/${qId}/answer`, {
+                method: 'PATCH',
+                body: JSON.stringify({ feedback: qf.feedback }),
+              }).then(applyQuestionUpdate).catch(() => {})
+            }
+          }
+        }
       })
       .catch((error) => {
         setMockFeedbackStatus('error')
@@ -298,6 +394,7 @@ function App() {
     setMockAnswers([])
     setMockFeedback(null)
     setMockFeedbackStatus('idle')
+    mockBankIdMapRef.current = new Map()
   }
 
   return (
@@ -331,7 +428,7 @@ function App() {
                 aria-expanded={isProfileDropdownOpen}
               >
                 <span className="profile-dropdown-value">
-                  {activeProfile?.roleDescription ?? (profiles.length === 0 ? 'No profiles yet' : 'Select a profile\u2026')}
+                  {activeProfile ? (activeProfile.roleName || activeProfile.roleDescription?.split('\n')[0]) : (profiles.length === 0 ? 'No profiles yet' : 'Select a profile\u2026')}
                 </span>
                 <span className={`chevron ${isProfileDropdownOpen ? 'open' : ''}`}>&#x25BC;</span>
               </button>
@@ -349,7 +446,7 @@ function App() {
                         aria-selected={activeProfile?.id === p.id}
                         onClick={() => selectProfile(p)}
                       >
-                        <span className="profile-name">{p.roleDescription}</span>
+                        <span className="profile-name">{p.roleName || p.roleDescription?.split('\n')[0]}</span>
                         <span className="profile-meta">{p.questions.length} questions</span>
                       </button>
                       <button
@@ -414,7 +511,52 @@ function App() {
             <>
               <div className="main-header">
                 <div>
-                  <h2 className="main-title">{activeProfile.roleDescription}</h2>
+                  <h2 className="main-title">{activeProfile.roleName || activeProfile.roleDescription?.split('\n')[0]}</h2>
+                  {/* Role summary inline editor */}
+                  {editingSummary ? (
+                    <div className="role-summary-editor">
+                      <textarea
+                        className="role-summary-textarea"
+                        value={editSummaryText}
+                        onChange={(e) => setEditSummaryText(e.target.value)}
+                        rows={3}
+                        placeholder="Describe the role in detail to improve AI question targeting\u2026"
+                      />
+                      <div className="role-summary-editor-actions">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={handleSaveSummary}
+                          disabled={isSavingSummary}
+                        >
+                          {isSavingSummary ? 'Saving\u2026' : 'Save Summary'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setEditingSummary(false)}
+                          disabled={isSavingSummary}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="role-summary-view">
+                      <span className="role-summary-text">
+                        {activeProfile.roleSummary || <em className="placeholder-text">No summary \u2014 add one to improve question targeting.</em>}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-icon"
+                        onClick={() => { setEditSummaryText(activeProfile.roleSummary ?? ''); setEditingSummary(true) }}
+                        title="Edit role summary"
+                        aria-label="Edit role summary"
+                      >
+                        \u270F
+                      </button>
+                    </div>
+                  )}
                   <p className="meta">
                     {answeredCount}/{activeProfile.questions.length} answered
                   </p>
@@ -491,6 +633,7 @@ function App() {
             <MockInterviewSession
               questions={mockQuestions}
               audioEnabled={mockConfig.audioEnabled}
+              voiceGender={mockConfig.voiceGender ?? 'female'}
               onComplete={handleMockComplete}
             />
           ) : mockState === 'awaiting-feedback' || mockState === 'results' ? (

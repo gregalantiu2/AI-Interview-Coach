@@ -1,6 +1,8 @@
 namespace AIInterviewCoach.Api.Models;
 
-public record CreateProfileRequest(string RoleDescription);
+public record CreateProfileRequest(string RoleName, string RoleSummary = "");
+
+public record UpdateProfileSummaryRequest(string RoleSummary);
 
 public record SaveAnswerRequest(string? Answer = null, string? Feedback = null);
 

@@ -120,6 +120,23 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
         return Ok(profiles);
     }
 
+    [HttpPatch("profiles/{profileId}/summary")]
+    [EnableRateLimiting("general")]
+    public async Task<ActionResult<InterviewSession>> UpdateProfileSummary(string profileId, [FromBody] UpdateProfileSummaryRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsValidSessionId(profileId)) return BadRequest("Invalid profile ID format.");
+
+        try
+        {
+            var session = await _service.UpdateProfileSummaryAsync(profileId, request, cancellationToken);
+            return Ok(session);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     [HttpPost("session/{sessionId}/questions")]
     [EnableRateLimiting("llm")]
     public async Task<ActionResult<AddQuestionsResponse>> AddQuestions(string sessionId, [FromBody] AddQuestionsRequest request, CancellationToken cancellationToken)
@@ -196,8 +213,8 @@ public class InterviewController(InterviewCoachService service) : ControllerBase
 
         try
         {
-            await _service.SaveAnswerAsync(sessionId, questionId, request, cancellationToken);
-            return NoContent();
+            var question = await _service.SaveAnswerAsync(sessionId, questionId, request, cancellationToken);
+            return Ok(question);
         }
         catch (KeyNotFoundException ex)
         {

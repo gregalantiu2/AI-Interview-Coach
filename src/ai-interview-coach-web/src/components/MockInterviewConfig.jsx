@@ -6,6 +6,7 @@ export default function MockInterviewConfig({ activeProfile, onStart }) {
   const [questionCount, setQuestionCount] = useState(5)
   const [source, setSource] = useState('new')
   const [audioEnabled, setAudioEnabled] = useState(false)
+  const [voiceGender, setVoiceGender] = useState('female')
   const [isLoading, setIsLoading] = useState(false)
 
   const sourceOptions = [
@@ -18,7 +19,7 @@ export default function MockInterviewConfig({ activeProfile, onStart }) {
     e.preventDefault()
     if (!activeProfile) return
     setIsLoading(true)
-    await onStart({ questionCount: Number(questionCount), source, audioEnabled })
+    await onStart({ questionCount: Number(questionCount), source, audioEnabled, voiceGender })
     setIsLoading(false)
   }
 
@@ -88,6 +89,28 @@ export default function MockInterviewConfig({ activeProfile, onStart }) {
             <span className="mock-toggle-status">{audioEnabled ? 'On' : 'Off'}</span>
           </div>
         </div>
+
+        {/* Voice gender — only shown when audio is enabled */}
+        {audioEnabled && (
+          <div className="mock-source-group">
+            <span className="mock-source-label">Voice</span>
+            <div className="mock-voice-options">
+              {[
+                { value: 'female', label: '\u2640 Female' },
+                { value: 'male', label: '\u2642 Male' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`mock-voice-btn${voiceGender === opt.value ? ' active' : ''}`}
+                  onClick={() => setVoiceGender(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mock-config-footer">

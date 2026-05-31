@@ -534,31 +534,31 @@ function App() {
                   {/* Role summary inline editor */}
                   {editingSummary ? (
                     <div className="role-summary-editor">
-                      <textarea
+                      <input
+                        type="text"
                         className="role-summary-textarea"
                         value={editSummaryText}
                         onChange={(e) => setEditSummaryText(e.target.value)}
-                        rows={3}
-                        placeholder="Describe the role in detail to improve AI question targeting…"
+                        placeholder="Describe the role to improve AI question targeting…"
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSummary(); if (e.key === 'Escape') setEditingSummary(false) }}
+                        autoFocus
                       />
-                      <div className="role-summary-editor-actions">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={handleSaveSummary}
-                          disabled={isSavingSummary}
-                        >
-                          {isSavingSummary ? 'Saving…' : 'Save Summary'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => setEditingSummary(false)}
-                          disabled={isSavingSummary}
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleSaveSummary}
+                        disabled={isSavingSummary}
+                      >
+                        {isSavingSummary ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setEditingSummary(false)}
+                        disabled={isSavingSummary}
+                      >
+                        Cancel
+                      </button>
                     </div>
                   ) : (
                     <div className="role-summary-view">
